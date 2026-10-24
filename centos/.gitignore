@@ -1,0 +1,16 @@
+# Compiled binaries (at root of centos/ dir)
+/hardening-tool
+/hardening-tool-centos
+/app
+
+# SQLite database (runtime state, not source)
+*.db
+*.sdb
+*.jfm
+
+# Temporary audit reports generated at runtime
+audit_report_landscape.pdf
+
+# OS-specific
+.DS_Store
+Thumbs.db

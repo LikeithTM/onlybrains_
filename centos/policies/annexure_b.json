@@ -1,0 +1,234 @@
+{
+    "version": "1.0",
+    "rules": [
+      {
+        "category": "2. Package Management",
+        "id": "LINUBU2bv",
+        "name": "Disable Automatic Error Reporting Apport",
+        "description": "Ensure Ubuntu Apport crash reporting service is disabled",
+        "severity": "Medium",
+        "platform": "ubuntu",
+        "type": "command",
+        "tags": ["process", "privacy"],
+        "check": {
+          "cmd": "bash",
+          "args": ["-c", "systemctl is-enabled apport 2>/dev/null || echo disabled"],
+          "expect_pattern": "disabled"
+        },
+        "remediation": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "systemctl disable --now apport"]
+        },
+        "rollback": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "systemctl enable --now apport"]
+        }
+      },
+      {
+        "category": "2. Package Management",
+        "id": "LINCOS2bv",
+        "name": "Disable Automatic Error Reporting ABRT",
+        "description": "Ensure CentOS ABRT crash reporting service is disabled",
+        "severity": "Medium",
+        "platform": "centos",
+        "type": "command",
+        "tags": ["process", "privacy"],
+        "check": {
+          "cmd": "bash",
+          "args": ["-c", "systemctl is-enabled abrtd 2>/dev/null || echo disabled"],
+          "expect_pattern": "disabled"
+        },
+        "remediation": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "systemctl disable --now abrtd abrt-ccpp abrt-oops abrt-xorg abrt-vmcore"]
+        },
+        "rollback": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "systemctl enable --now abrtd abrt-ccpp abrt-oops abrt-xorg abrt-vmcore"]
+        }
+      },
+      {
+        "category": "5. Host Based Firewall",
+        "id": "LIN-UBU-5-a-i",
+        "name": "Install UFW Firewall",
+        "description": "Ensure UFW is installed using apt",
+        "severity": "High",
+        "platform": "ubuntu",
+        "type": "command",
+        "tags": ["firewall"],
+        "check": {
+          "cmd": "bash",
+          "args": ["-c", "dpkg -s ufw >/dev/null 2>&1 && echo installed || echo notinstalled"],
+          "expect_pattern": "installed"
+        },
+        "remediation": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ufw"]
+        },
+        "rollback": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "DEBIAN_FRONTEND=noninteractive apt-get remove -y ufw"]
+        }
+      },
+      {
+        "category": "4. Network",
+        "id": "LIN-COS-4-c-i",
+        "name": "Disable IPv6",
+        "description": "Ensure IPv6 is disabled via sysctl on CentOS",
+        "severity": "Medium",
+        "platform": "centos",
+        "type": "command",
+        "tags": ["network"],
+        "check": {
+          "cmd": "bash",
+          "args": ["-c", "sysctl net.ipv6.conf.all.disable_ipv6 | grep -q '= 1' && echo 1 || echo 0"],
+          "expect_pattern": "1"
+        },
+        "remediation": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "sysctl -w net.ipv6.conf.all.disable_ipv6=1 && sysctl -w net.ipv6.conf.default.disable_ipv6=1 && echo 'net.ipv6.conf.all.disable_ipv6=1' >> /etc/sysctl.conf && echo 'net.ipv6.conf.default.disable_ipv6=1' >> /etc/sysctl.conf"]
+        },
+        "rollback": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "sysctl -w net.ipv6.conf.all.disable_ipv6=0 && sysctl -w net.ipv6.conf.default.disable_ipv6=0 && sed -i '/net.ipv6.conf.all.disable_ipv6=1/d' /etc/sysctl.conf && sed -i '/net.ipv6.conf.default.disable_ipv6=1/d' /etc/sysctl.conf"]
+        }
+      },
+      {
+        "category": "3. Services",
+        "id": "LIN-COS-3-b-iv",
+        "name": "Uninstall Telnet Client",
+        "description": "Ensure Telnet client is not installed on CentOS",
+        "severity": "High",
+        "platform": "centos",
+        "type": "command",
+        "tags": ["services"],
+        "check": {
+          "cmd": "bash",
+          "args": ["-c", "rpm -q telnet >/dev/null 2>&1 && echo installed || echo notinstalled"],
+          "expect_pattern": "notinstalled"
+        },
+        "remediation": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "yum remove -y telnet"]
+        },
+        "rollback": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "yum install -y telnet"]
+        }
+      },
+      {
+        "category": "3. Services",
+        "id": "LIN-COS-3-e-i",
+        "name": "Install Chrony",
+        "description": "Ensure Chrony is installed for time synchronization",
+        "severity": "Medium",
+        "platform": "centos",
+        "type": "command",
+        "tags": ["time"],
+        "check": {
+          "cmd": "bash",
+          "args": ["-c", "rpm -q chrony >/dev/null 2>&1 && echo installed || echo notinstalled"],
+          "expect_pattern": "installed"
+        },
+        "remediation": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "yum install -y chrony && systemctl enable --now chronyd"]
+        },
+        "rollback": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "systemctl disable --now chronyd && yum remove -y chrony"]
+        }
+      },
+      {
+        "category": "6. Access Control",
+        "id": "LIN-COS-6-a-i",
+        "name": "Enable SELinux Enforcing Mode",
+        "description": "Ensure SELinux is set to enforcing on CentOS systems",
+        "severity": "Critical",
+        "platform": "centos",
+        "type": "command",
+        "tags": ["selinux", "accesscontrol"],
+        "check": {
+          "cmd": "bash",
+          "args": ["-c", "getenforce | grep -q Enforcing && echo Enforcing || echo notEnforcing"],
+          "expect_pattern": "Enforcing"
+        },
+        "remediation": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "setenforce 1 && sed -i 's/^SELINUX=.*/SELINUX=enforcing/' /etc/selinux/config"]
+        },
+        "rollback": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "setenforce 0 && sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config"]
+        }
+      },
+      {
+        "category": "8. Logging and Auditing",
+        "id": "LIN-COS-8-b-i",
+        "name": "Install Auditd",
+        "description": "Ensure auditd is installed on CentOS",
+        "severity": "High",
+        "platform": "centos",
+        "type": "command",
+        "tags": ["audit", "logging"],
+        "check": {
+          "cmd": "bash",
+          "args": ["-c", "rpm -q audit >/dev/null 2>&1 && echo installed || echo notinstalled"],
+          "expect_pattern": "installed"
+        },
+        "remediation": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "yum install -y audit && systemctl enable --now auditd"]
+        },
+        "rollback": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "systemctl disable --now auditd && yum remove -y audit"]
+        }
+      },
+      {
+        "category": "3. Services",
+        "id": "LIN-COS-3-a-xx",
+        "name": "Disable X Window System",
+        "description": "Ensure X Window graphical interface is disabled on CentOS server",
+        "severity": "High",
+        "platform": "centos",
+        "type": "command",
+        "tags": ["services", "gui"],
+        "check": {
+          "cmd": "bash",
+          "args": ["-c", "systemctl get-default | grep -q multi-user.target && echo multiuser || echo graphical"],
+          "expect_pattern": "multiuser"
+        },
+        "remediation": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "systemctl set-default multi-user.target"]
+        },
+        "rollback": {
+          "type": "command",
+          "cmd": "bash",
+          "args": ["-c", "systemctl set-default graphical.target"]
+        }
+      }
+    ]
+  }
+
+
+
+   

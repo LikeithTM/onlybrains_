@@ -1,0 +1,512 @@
+{
+  "version": "1.1",
+  "description": "SentinelX CentOS Stream 9 Hardening Policy — Tier-1 Controls",
+  "platform": "centos",
+  "benchmark_note": "Control IDs prefixed SX-COS are internal SentinelX identifiers. CIS benchmark mappings are listed where the mapping has been manually verified against CIS CentOS Linux 8 Benchmark v1.0.0 as a reference. Stream 9 specifics should be re-verified against the official CIS CentOS Stream 9 Benchmark when published.",
+  "rules": [
+
+    {
+      "category": "6. Access Control — SELinux",
+      "id": "SX-COS-6-01",
+      "name": "SELinux Enforcing Mode (Runtime)",
+      "description": "Ensure SELinux is in enforcing mode at runtime. SELinux provides mandatory access controls that constrain the impact of a compromised process.",
+      "severity": "Critical",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["selinux", "access-control"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 1.6.1.2 (reference only)",
+      "check": {
+        "cmd": "getenforce",
+        "args": [],
+        "expect_pattern": "Enforcing"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "setenforce",
+        "args": ["1"]
+      },
+      "rollback": {
+        "type": "command",
+        "cmd": "setenforce",
+        "args": ["0"]
+      }
+    },
+
+    {
+      "category": "6. Access Control — SELinux",
+      "id": "SX-COS-6-02",
+      "name": "SELinux Persistent Enforcing Configuration",
+      "description": "Ensure SELINUX=enforcing is set in /etc/selinux/config so the mode survives reboots. Runtime mode change via setenforce does not persist across reboot.",
+      "severity": "Critical",
+      "platform": "centos",
+      "type": "file_check",
+      "tags": ["selinux", "access-control", "persistent"],
+      "depends_on": ["SX-COS-6-01"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 1.6.1.2 (reference only)",
+      "check": {
+        "cmd": "grep",
+        "args": ["-E", "^SELINUX=enforcing", "/etc/selinux/config"],
+        "expect_pattern": "SELINUX=enforcing"
+      },
+      "remediation": {
+        "type": "file_edit",
+        "file_path": "/etc/selinux/config",
+        "search_regex": "^SELINUX=.*",
+        "replace_text": "SELINUX=enforcing"
+      },
+      "rollback": {
+        "type": "file_edit",
+        "file_path": "/etc/selinux/config",
+        "search_regex": "^SELINUX=.*",
+        "replace_text": "SELINUX=permissive"
+      }
+    },
+
+    {
+      "category": "9. SSH Server Configuration",
+      "id": "SX-COS-9-01",
+      "name": "SSH — Disable Root Login",
+      "description": "Ensure PermitRootLogin is set to 'no' in sshd_config. Direct root SSH login bypasses account-level audit trails and violates least-privilege principles.",
+      "severity": "High",
+      "platform": "centos",
+      "type": "file_check",
+      "tags": ["ssh", "access-control"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 5.2.10 (reference only)",
+      "check": {
+        "cmd": "grep",
+        "args": ["-E", "^PermitRootLogin\\s+no", "/etc/ssh/sshd_config"],
+        "expect_pattern": "PermitRootLogin no"
+      },
+      "remediation": {
+        "type": "file_edit",
+        "file_path": "/etc/ssh/sshd_config",
+        "search_regex": "^#?\\s*PermitRootLogin.*",
+        "replace_text": "PermitRootLogin no"
+      },
+      "rollback": {
+        "type": "file_edit",
+        "file_path": "/etc/ssh/sshd_config",
+        "search_regex": "^PermitRootLogin.*",
+        "replace_text": "PermitRootLogin yes"
+      }
+    },
+
+    {
+      "category": "9. SSH Server Configuration",
+      "id": "SX-COS-9-02",
+      "name": "SSH — Disable Password Authentication",
+      "description": "Ensure PasswordAuthentication is set to 'no'. Key-based authentication is significantly stronger than password authentication and should be the only allowed method.",
+      "severity": "High",
+      "platform": "centos",
+      "type": "file_check",
+      "tags": ["ssh", "access-control", "authentication"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 5.2.12 (reference only)",
+      "check": {
+        "cmd": "grep",
+        "args": ["-E", "^PasswordAuthentication\\s+no", "/etc/ssh/sshd_config"],
+        "expect_pattern": "PasswordAuthentication no"
+      },
+      "remediation": {
+        "type": "file_edit",
+        "file_path": "/etc/ssh/sshd_config",
+        "search_regex": "^#?\\s*PasswordAuthentication.*",
+        "replace_text": "PasswordAuthentication no"
+      },
+      "rollback": {
+        "type": "file_edit",
+        "file_path": "/etc/ssh/sshd_config",
+        "search_regex": "^PasswordAuthentication.*",
+        "replace_text": "PasswordAuthentication yes"
+      }
+    },
+
+    {
+      "category": "9. SSH Server Configuration",
+      "id": "SX-COS-9-03",
+      "name": "SSH — Disable Empty Password Login",
+      "description": "Ensure PermitEmptyPasswords is set to 'no'. Accounts with empty passwords represent an unacceptable security risk.",
+      "severity": "Critical",
+      "platform": "centos",
+      "type": "file_check",
+      "tags": ["ssh", "access-control", "authentication"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 5.2.11 (reference only)",
+      "check": {
+        "cmd": "grep",
+        "args": ["-E", "^PermitEmptyPasswords\\s+no", "/etc/ssh/sshd_config"],
+        "expect_pattern": "PermitEmptyPasswords no"
+      },
+      "remediation": {
+        "type": "file_edit",
+        "file_path": "/etc/ssh/sshd_config",
+        "search_regex": "^#?\\s*PermitEmptyPasswords.*",
+        "replace_text": "PermitEmptyPasswords no"
+      },
+      "rollback": {
+        "type": "file_edit",
+        "file_path": "/etc/ssh/sshd_config",
+        "search_regex": "^PermitEmptyPasswords.*",
+        "replace_text": "PermitEmptyPasswords no"
+      }
+    },
+
+    {
+      "category": "8. Logging and Auditing",
+      "id": "SX-COS-8-01",
+      "name": "auditd — Package Installed",
+      "description": "Ensure the 'audit' package (auditd) is installed. auditd provides kernel-level audit event recording required for CIS compliance and forensic investigation.",
+      "severity": "High",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["audit", "logging"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 4.1.1.1 (reference only)",
+      "check": {
+        "cmd": "rpm",
+        "args": ["-q", "audit"],
+        "expect_pattern": "audit-"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "dnf",
+        "args": ["install", "-y", "audit"]
+      },
+      "rollback": {
+        "type": "manual",
+        "cmd": "echo",
+        "args": ["Manual: dnf remove -y audit  (WARNING: removing audit may violate compliance requirements)"]
+      }
+    },
+
+    {
+      "category": "8. Logging and Auditing",
+      "id": "SX-COS-8-02",
+      "name": "auditd — Service Enabled and Active",
+      "description": "Ensure auditd is enabled to start at boot and is currently running. auditd must be active to record events.",
+      "severity": "High",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["audit", "logging", "service"],
+      "depends_on": ["SX-COS-8-01"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 4.1.1.2 (reference only)",
+      "check": {
+        "cmd": "bash",
+        "args": ["-c", "systemctl is-enabled auditd 2>/dev/null | grep -q enabled && systemctl is-active auditd 2>/dev/null | grep -q active && echo ok || echo fail"],
+        "expect_pattern": "ok"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "bash",
+        "args": ["-c", "systemctl enable --now auditd"]
+      },
+      "rollback": {
+        "type": "command",
+        "cmd": "bash",
+        "args": ["-c", "systemctl disable --now auditd"]
+      }
+    },
+
+    {
+      "category": "3. Services — Time Synchronization",
+      "id": "SX-COS-3-01",
+      "name": "Chrony — Package Installed",
+      "description": "Ensure chrony is installed for time synchronization. Accurate time is required for log correlation, certificate validity and Kerberos authentication.",
+      "severity": "Medium",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["time", "ntp"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 2.1.1 (reference only)",
+      "check": {
+        "cmd": "rpm",
+        "args": ["-q", "chrony"],
+        "expect_pattern": "chrony-"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "dnf",
+        "args": ["install", "-y", "chrony"]
+      },
+      "rollback": {
+        "type": "manual",
+        "cmd": "echo",
+        "args": ["Manual: dnf remove -y chrony  (WARNING: removing time sync may affect certificate and log validity)"]
+      }
+    },
+
+    {
+      "category": "3. Services — Time Synchronization",
+      "id": "SX-COS-3-02",
+      "name": "Chrony — Service Enabled and Active",
+      "description": "Ensure chronyd is enabled at boot and actively synchronizing time.",
+      "severity": "Medium",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["time", "ntp", "service"],
+      "depends_on": ["SX-COS-3-01"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 2.1.1 (reference only)",
+      "check": {
+        "cmd": "bash",
+        "args": ["-c", "systemctl is-enabled chronyd 2>/dev/null | grep -q enabled && systemctl is-active chronyd 2>/dev/null | grep -q active && echo ok || echo fail"],
+        "expect_pattern": "ok"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "bash",
+        "args": ["-c", "systemctl enable --now chronyd"]
+      },
+      "rollback": {
+        "type": "command",
+        "cmd": "bash",
+        "args": ["-c", "systemctl disable --now chronyd"]
+      }
+    },
+
+    {
+      "category": "3. Services — Legacy Protocols",
+      "id": "SX-COS-3-03",
+      "name": "Telnet Client — Not Installed",
+      "description": "Ensure the telnet client package is absent. Telnet transmits credentials in cleartext and should not be available on hardened systems.",
+      "severity": "High",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["services", "legacy"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 2.3.4 (reference only)",
+      "check": {
+        "cmd": "bash",
+        "args": ["-c", "rpm -q telnet >/dev/null 2>&1 && echo installed || echo notinstalled"],
+        "expect_pattern": "notinstalled"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "dnf",
+        "args": ["remove", "-y", "telnet"]
+      },
+      "rollback": {
+        "type": "manual",
+        "cmd": "echo",
+        "args": ["Manual: dnf install -y telnet  (telnet is a legacy insecure protocol; re-installation is not recommended)"]
+      }
+    },
+
+    {
+      "category": "3. Services — Crash Reporting",
+      "id": "SX-COS-3-04",
+      "name": "ABRT — Disabled",
+      "description": "Ensure the ABRT (Automatic Bug Reporting Tool) daemon is disabled. ABRT can transmit crash data including potentially sensitive process memory contents to external systems.",
+      "severity": "Medium",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["services", "privacy"],
+      "benchmark": "Internal SentinelX control SX-COS-3-04 (no verified CIS mapping)",
+      "check": {
+        "cmd": "bash",
+        "args": ["-c", "systemctl is-enabled abrtd 2>/dev/null | grep -q masked && echo disabled || systemctl is-enabled abrtd 2>/dev/null | grep -qE '(disabled|not-found)' && echo disabled || echo enabled"],
+        "expect_pattern": "disabled"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "bash",
+        "args": ["-c", "for svc in abrtd abrt-ccpp abrt-oops abrt-xorg abrt-vmcore; do systemctl disable --now $svc 2>/dev/null || true; done"]
+      },
+      "rollback": {
+        "type": "manual",
+        "cmd": "echo",
+        "args": ["Manual: systemctl enable --now abrtd  (ABRT is disabled for privacy; re-enable only if required by your support agreement)"]
+      }
+    },
+
+    {
+      "category": "3. Services — Display Manager",
+      "id": "SX-COS-3-05",
+      "name": "Default Systemd Target — Multi-User (Non-Graphical)",
+      "description": "Ensure the default systemd target is multi-user.target rather than graphical.target. Servers should not run a graphical environment to minimize attack surface.",
+      "severity": "High",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["services", "gui"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 2.2.2 (reference only)",
+      "check": {
+        "cmd": "systemctl",
+        "args": ["get-default"],
+        "expect_pattern": "multi-user.target"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "systemctl",
+        "args": ["set-default", "multi-user.target"]
+      },
+      "rollback": {
+        "type": "command",
+        "cmd": "systemctl",
+        "args": ["set-default", "graphical.target"]
+      }
+    },
+
+    {
+      "category": "4. Network — Kernel Parameters",
+      "id": "SX-COS-4-01",
+      "name": "Sysctl — IP Forwarding Disabled",
+      "description": "Ensure net.ipv4.ip_forward is set to 0. IP forwarding should be disabled unless this system is explicitly configured as a router. Enabling it increases exposure to routing-based attacks.",
+      "severity": "Medium",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["network", "sysctl"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 3.1.1 (reference only)",
+      "check": {
+        "cmd": "sysctl",
+        "args": ["net.ipv4.ip_forward"],
+        "expect_pattern": "net.ipv4.ip_forward = 0"
+      },
+      "remediation": {
+        "type": "file_edit",
+        "file_path": "/etc/sysctl.d/99-sentinelx.conf",
+        "search_regex": "^net\\.ipv4\\.ip_forward.*",
+        "replace_text": "net.ipv4.ip_forward = 0"
+      },
+      "rollback": {
+        "type": "file_edit",
+        "file_path": "/etc/sysctl.d/99-sentinelx.conf",
+        "search_regex": "^net\\.ipv4\\.ip_forward.*",
+        "replace_text": "net.ipv4.ip_forward = 0"
+      }
+    },
+
+    {
+      "category": "4. Network — Kernel Parameters",
+      "id": "SX-COS-4-02",
+      "name": "Sysctl — ICMP Redirects Disabled (All Interfaces)",
+      "description": "Ensure net.ipv4.conf.all.accept_redirects is set to 0. ICMP redirect messages can be used to manipulate routing tables and should be rejected.",
+      "severity": "Medium",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["network", "sysctl", "icmp"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 3.3.2 (reference only)",
+      "check": {
+        "cmd": "sysctl",
+        "args": ["net.ipv4.conf.all.accept_redirects"],
+        "expect_pattern": "net.ipv4.conf.all.accept_redirects = 0"
+      },
+      "remediation": {
+        "type": "file_edit",
+        "file_path": "/etc/sysctl.d/99-sentinelx.conf",
+        "search_regex": "^net\\.ipv4\\.conf\\.all\\.accept_redirects.*",
+        "replace_text": "net.ipv4.conf.all.accept_redirects = 0"
+      },
+      "rollback": {
+        "type": "file_edit",
+        "file_path": "/etc/sysctl.d/99-sentinelx.conf",
+        "search_regex": "^net\\.ipv4\\.conf\\.all\\.accept_redirects.*",
+        "replace_text": "net.ipv4.conf.all.accept_redirects = 1"
+      }
+    },
+
+    {
+      "category": "4. Network — Kernel Parameters",
+      "id": "SX-COS-4-03",
+      "name": "Sysctl — TCP SYN Cookies Enabled",
+      "description": "Ensure net.ipv4.tcp_syncookies is set to 1. TCP SYN cookies protect against SYN flood denial-of-service attacks.",
+      "severity": "Medium",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["network", "sysctl", "dos-protection"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 3.3.8 (reference only)",
+      "check": {
+        "cmd": "sysctl",
+        "args": ["net.ipv4.tcp_syncookies"],
+        "expect_pattern": "net.ipv4.tcp_syncookies = 1"
+      },
+      "remediation": {
+        "type": "file_edit",
+        "file_path": "/etc/sysctl.d/99-sentinelx.conf",
+        "search_regex": "^net\\.ipv4\\.tcp_syncookies.*",
+        "replace_text": "net.ipv4.tcp_syncookies = 1"
+      },
+      "rollback": {
+        "type": "file_edit",
+        "file_path": "/etc/sysctl.d/99-sentinelx.conf",
+        "search_regex": "^net\\.ipv4\\.tcp_syncookies.*",
+        "replace_text": "net.ipv4.tcp_syncookies = 0"
+      }
+    },
+
+    {
+      "category": "7. File Permissions",
+      "id": "SX-COS-7-01",
+      "name": "/etc/passwd — Permissions 0644",
+      "description": "Ensure /etc/passwd has permissions 0644 (rw-r--r--). This file must be world-readable but must not be world-writable.",
+      "severity": "High",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["file-permissions", "accounts"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 6.1.2 (reference only)",
+      "check": {
+        "cmd": "bash",
+        "args": ["-c", "stat -c '%a' /etc/passwd | grep -qx '644' && echo ok || echo fail"],
+        "expect_pattern": "ok"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "chmod",
+        "args": ["0644", "/etc/passwd"]
+      },
+      "rollback": {
+        "type": "command",
+        "cmd": "chmod",
+        "args": ["0644", "/etc/passwd"]
+      }
+    },
+
+    {
+      "category": "7. File Permissions",
+      "id": "SX-COS-7-02",
+      "name": "/etc/shadow — Permissions 0000",
+      "description": "Ensure /etc/shadow has permissions 0000 (----------). The shadow password file must not be readable by any unprivileged user or process.",
+      "severity": "Critical",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["file-permissions", "accounts", "passwords"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 6.1.3 (reference only)",
+      "check": {
+        "cmd": "bash",
+        "args": ["-c", "stat -c '%a' /etc/shadow 2>/dev/null | grep -qE '^0?0?0$' && echo ok || echo fail"],
+        "expect_pattern": "ok"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "chmod",
+        "args": ["0000", "/etc/shadow"]
+      },
+      "rollback": {
+        "type": "command",
+        "cmd": "chmod",
+        "args": ["0000", "/etc/shadow"]
+      }
+    },
+
+    {
+      "category": "7. File Permissions",
+      "id": "SX-COS-7-03",
+      "name": "/etc/group — Permissions 0644",
+      "description": "Ensure /etc/group has permissions 0644 (rw-r--r--). This file must be world-readable but must not be world-writable.",
+      "severity": "Medium",
+      "platform": "centos",
+      "type": "command",
+      "tags": ["file-permissions", "accounts"],
+      "benchmark": "CIS CentOS Linux 8 v1.0.0 § 6.1.4 (reference only)",
+      "check": {
+        "cmd": "bash",
+        "args": ["-c", "stat -c '%a' /etc/group | grep -qx '644' && echo ok || echo fail"],
+        "expect_pattern": "ok"
+      },
+      "remediation": {
+        "type": "command",
+        "cmd": "chmod",
+        "args": ["0644", "/etc/group"]
+      },
+      "rollback": {
+        "type": "command",
+        "cmd": "chmod",
+        "args": ["0644", "/etc/group"]
+      }
+    }
+
+  ]
+}
