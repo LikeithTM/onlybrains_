@@ -1,317 +1,1286 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SentinelX Hardening Tool</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-    
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f5f5f5; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
-        
-        /* Professional Theme Colors */
-        :root {
-            --header-blue: #1e3a5f;
-            --header-blue-dark: #152d47;
-            --content-gray: #f5f5f5;
-            --card-bg: #ffffff;
-            --border-color: #e0e0e0;
-            --text-primary: #1a1a1a;
-            --text-secondary: #666666;
-            --accent-blue: #2563eb;
-            --accent-orange: #f97316;
-        }
-        
-        /* Subtle Glow Effects */
-        .glow-text { text-shadow: 0 0 8px rgba(37, 99, 235, 0.3); }
-        .glow-box { box-shadow: 0 0 15px rgba(37, 99, 235, 0.1); }
-        .glow-fail { text-shadow: 0 0 8px rgba(239, 68, 68, 0.3); }
-        
-        /* Scrollbar Styling */
-        ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-track { background: #e5e5e5; border-left: 1px solid #d0d0d0; }
-        ::-webkit-scrollbar-thumb { background: #b0b0b0; border-radius: 5px; border: 2px solid #e5e5e5; }
-        ::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SentinelX — Security Hardening Console</title>
+<meta name="description" content="Autonomous multi-platform security hardening agent — real-time assessment and remediation console.">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-        /* Animations */
-        @keyframes pulse-scan {
-            0% { border-color: #2563eb; box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.5); }
-            70% { border-color: #3b82f6; box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
-            100% { border-color: #2563eb; box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
-        }
-        .animate-scan-pulse { animation: pulse-scan 2s infinite; }
-    </style>
+<style>
+/* =====================================================================
+   CYBERPUNK DESIGN SYSTEM
+   ===================================================================== */
+:root {
+  /* Core palette */
+  --bg-void:      #030510;
+  --bg-deep:      #060c1a;
+  --bg-panel:     #0a1228;
+  --bg-card:      #0d1830;
+  --bg-hover:     #111f3d;
+  --bg-selected:  #0f2244;
+
+  /* Neon accents */
+  --cyan:         #00f5ff;
+  --cyan-dim:     #00b8c4;
+  --cyan-glow:    rgba(0,245,255,0.15);
+  --blue:         #0066ff;
+  --blue-bright:  #3399ff;
+  --magenta:      #cc00ff;
+  --magenta-dim:  #9900cc;
+  --amber:        #ffaa00;
+  --amber-dim:    #cc8800;
+
+  /* Status */
+  --pass:         #00ff88;
+  --pass-dim:     #00cc66;
+  --pass-bg:      rgba(0,255,136,0.08);
+  --fail:         #ff3355;
+  --fail-dim:     #cc2244;
+  --fail-bg:      rgba(255,51,85,0.08);
+  --warn:         #ffaa00;
+  --warn-bg:      rgba(255,170,0,0.08);
+  --error:        #ff6600;
+  --error-bg:     rgba(255,102,0,0.08);
+  --unknown:      #6688aa;
+  --unknown-bg:   rgba(102,136,170,0.08);
+
+  /* Text */
+  --text-primary:   #e0eeff;
+  --text-secondary: #6688aa;
+  --text-dim:       #334466;
+  --text-mono:      #00f5ff;
+
+  /* Borders */
+  --border:       rgba(0,245,255,0.12);
+  --border-hover: rgba(0,245,255,0.3);
+  --border-active:rgba(0,245,255,0.6);
+
+  /* Shadows */
+  --shadow-panel: 0 4px 24px rgba(0,0,0,0.6);
+  --shadow-cyan:  0 0 20px rgba(0,245,255,0.2);
+  --shadow-card:  0 2px 12px rgba(0,0,0,0.4);
+
+  /* Grid */
+  --sidebar-w: 260px;
+  --topbar-h:  56px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%; width: 100%; overflow: hidden;
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: #1a3060; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--cyan-dim); }
+
+/* ===== LAYOUT ===== */
+#app {
+  display: grid;
+  grid-template-rows: var(--topbar-h) 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-areas:
+    "topbar topbar"
+    "sidebar main";
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ===== TOPBAR ===== */
+#topbar {
+  grid-area: topbar;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+  gap: 16px;
+}
+.topbar-brand {
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.brand-icon {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--cyan), var(--blue));
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.brand-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 18px; font-weight: 900;
+  letter-spacing: 4px;
+  color: var(--cyan);
+  text-shadow: 0 0 20px rgba(0,245,255,0.5);
+}
+.brand-sub {
+  font-size: 10px; letter-spacing: 3px;
+  color: var(--text-secondary); text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+}
+.topbar-center {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 24px;
+}
+.topbar-stat {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.topbar-stat-label {
+  font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;
+}
+.topbar-stat-value {
+  font-size: 15px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+  color: var(--cyan);
+}
+.topbar-divider { width: 1px; height: 28px; background: var(--border); }
+.topbar-right {
+  display: flex; align-items: center; gap: 16px; flex-shrink: 0;
+}
+.connection-status {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-family: 'JetBrains Mono', monospace;
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--pass);
+  box-shadow: 0 0 8px var(--pass);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { opacity:1; box-shadow: 0 0 8px var(--pass); }
+  50%      { opacity:0.6; box-shadow: 0 0 3px var(--pass); }
+}
+.topbar-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text-secondary);
+}
+
+/* ===== SIDEBAR ===== */
+#sidebar {
+  grid-area: sidebar;
+  background: var(--bg-deep);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  padding-top: 8px;
+}
+.sidebar-section-label {
+  font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
+  padding: 12px 20px 4px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px; cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px; font-weight: 500;
+  transition: all 0.15s;
+  border-left: 2px solid transparent;
+  user-select: none;
+}
+.nav-item:hover { color: var(--text-primary); background: var(--bg-hover); }
+.nav-item.active {
+  color: var(--cyan);
+  background: var(--cyan-glow);
+  border-left-color: var(--cyan);
+}
+.nav-icon { width: 16px; flex-shrink: 0; opacity: 0.7; }
+.nav-item.active .nav-icon { opacity: 1; }
+.nav-badge {
+  margin-left: auto;
+  background: var(--fail-bg); color: var(--fail);
+  border: 1px solid rgba(255,51,85,0.3);
+  font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  padding: 1px 6px; border-radius: 10px; min-width: 20px; text-align: center;
+}
+
+/* Profile + scan controls at sidebar bottom */
+.sidebar-controls {
+  margin-top: auto;
+  padding: 16px;
+  border-top: 1px solid var(--border);
+}
+.score-ring-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 16px 0 8px;
+}
+.score-ring {
+  position: relative; width: 110px; height: 110px; margin-bottom: 10px;
+}
+.score-ring svg { transform: rotate(-90deg); }
+.score-ring-text {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.score-num {
+  font-family: 'Orbitron', monospace;
+  font-size: 26px; font-weight: 700; color: var(--cyan);
+  line-height: 1;
+}
+.score-label {
+  font-size: 9px; letter-spacing: 2px; color: var(--text-secondary);
+  text-transform: uppercase; margin-top: 3px;
+}
+.stats-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; margin-bottom: 12px;
+}
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px;
+}
+.stat-card-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); }
+.stat-card-value { font-family: 'Orbitron', monospace; font-size: 20px; font-weight: 700; }
+
+.profile-select {
+  width: 100%; padding: 7px 10px;
+  background: var(--bg-card); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  outline: none; margin-bottom: 10px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2300f5ff'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+  cursor: pointer;
+}
+.profile-select:focus { border-color: var(--border-hover); }
+
+.btn-scan {
+  width: 100%; padding: 11px;
+  background: linear-gradient(135deg, #001a4d, #003080);
+  color: var(--cyan); border: 1px solid var(--cyan-dim);
+  border-radius: 6px; font-family: 'Orbitron', monospace;
+  font-size: 12px; font-weight: 700; letter-spacing: 3px;
+  cursor: pointer; transition: all 0.2s;
+  text-transform: uppercase;
+  box-shadow: 0 0 15px rgba(0,245,255,0.15);
+}
+.btn-scan:hover:not(:disabled) {
+  background: linear-gradient(135deg, #002266, #0044cc);
+  box-shadow: 0 0 25px rgba(0,245,255,0.3);
+  border-color: var(--cyan);
+}
+.btn-scan:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-scan.scanning { animation: scan-pulse 1.5s ease-in-out infinite; }
+@keyframes scan-pulse {
+  0%,100% { box-shadow: 0 0 15px rgba(0,245,255,0.15); }
+  50%      { box-shadow: 0 0 35px rgba(0,245,255,0.5); }
+}
+
+.btn-reset {
+  width: 100%; padding: 8px;
+  background: transparent; color: var(--fail-dim);
+  border: 1px solid rgba(255,51,85,0.3); border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  cursor: pointer; margin-top: 8px; transition: all 0.2s;
+}
+.btn-reset:hover { color: var(--fail); border-color: var(--fail); background: var(--fail-bg); }
+
+/* ===== MAIN AREA ===== */
+#main {
+  grid-area: main;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-void);
+}
+
+/* ===== TABS ===== */
+.tab-bar {
+  display: flex; align-items: center;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px; gap: 4px; flex-shrink: 0;
+  height: 44px;
+}
+.tab {
+  padding: 6px 14px; cursor: pointer;
+  font-size: 12px; font-weight: 500; letter-spacing: 1px;
+  color: var(--text-secondary); border-radius: 4px;
+  transition: all 0.15s; border: 1px solid transparent;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+}
+.tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+.tab.active {
+  color: var(--cyan); border-color: rgba(0,245,255,0.3);
+  background: var(--cyan-glow);
+}
+.tab-actions { margin-left: auto; display: flex; gap: 8px; }
+.btn-sm {
+  padding: 5px 12px;
+  background: var(--bg-card); color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+}
+.btn-sm:hover { color: var(--cyan); border-color: var(--border-hover); }
+
+/* ===== CONTENT PANELS ===== */
+.panel { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+.panel.active { display: flex; }
+
+/* ===== FINDINGS TABLE ===== */
+.findings-wrap {
+  flex: 1; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.table-header {
+  display: grid; grid-template-columns: 160px 1fr 90px 80px 120px;
+  padding: 8px 16px;
+  background: var(--bg-panel); border-bottom: 1px solid var(--border);
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
+  flex-shrink: 0;
+}
+.table-body { flex: 1; overflow-y: auto; padding: 8px; }
+.finding-row {
+  display: grid; grid-template-columns: 160px 1fr 90px 80px 120px;
+  align-items: center; padding: 9px 8px;
+  border: 1px solid var(--border); border-radius: 6px;
+  margin-bottom: 4px; background: var(--bg-card);
+  transition: all 0.15s; cursor: default;
+}
+.finding-row:hover { border-color: var(--border-hover); background: var(--bg-hover); }
+.finding-row.is-fail { border-left: 2px solid var(--fail); }
+.finding-row.is-pass { border-left: 2px solid var(--pass); }
+.finding-row.is-error { border-left: 2px solid var(--error); }
+.finding-row.is-unknown { border-left: 2px solid var(--unknown); }
+
+.rule-id { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-secondary); }
+.rule-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.sev-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 2px 8px; border-radius: 10px;
+  font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+}
+.sev-Critical { background: rgba(255,51,85,0.15); color: #ff3355; border: 1px solid rgba(255,51,85,0.3); }
+.sev-High     { background: rgba(255,102,0,0.15); color: #ff6600; border: 1px solid rgba(255,102,0,0.3); }
+.sev-Medium   { background: rgba(255,170,0,0.15); color: #ffaa00; border: 1px solid rgba(255,170,0,0.3); }
+.sev-Low      { background: rgba(0,245,255,0.08); color: var(--cyan-dim); border: 1px solid rgba(0,245,255,0.2); }
+
+.status-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-family: 'JetBrains Mono', monospace;
+  font-weight: 700; padding: 2px 8px; border-radius: 4px;
+}
+.status-PASS    { color: var(--pass);    background: var(--pass-bg); }
+.status-FAIL    { color: var(--fail);    background: var(--fail-bg); }
+.status-ERROR   { color: var(--error);   background: var(--error-bg); }
+.status-UNKNOWN { color: var(--unknown); background: var(--unknown-bg); }
+.status-TIMEOUT { color: var(--warn);    background: var(--warn-bg); }
+.status-NOT_APPLICABLE { color: var(--unknown); background: var(--unknown-bg); }
+
+.action-cell { display: flex; justify-content: flex-end; }
+.btn-fix {
+  padding: 4px 12px; font-size: 11px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: 1px;
+  border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  text-transform: uppercase;
+  background: var(--fail-bg); color: var(--fail);
+  border: 1px solid rgba(255,51,85,0.4);
+}
+.btn-fix:hover:not(:disabled) { background: rgba(255,51,85,0.2); box-shadow: 0 0 10px rgba(255,51,85,0.3); }
+.btn-fix:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-undo {
+  padding: 4px 12px; font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.btn-undo:hover { color: var(--amber); border-color: var(--amber); }
+.secure-tag {
+  display: flex; align-items: center; gap-4px;
+  font-size: 11px; color: var(--pass); font-family: 'JetBrains Mono', monospace;
+}
+
+/* ===== LIVE CONSOLE ===== */
+.console-wrap {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+.console-header {
+  padding: 10px 16px; background: var(--bg-panel);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.console-job-info {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--text-secondary);
+}
+.console-job-id { color: var(--cyan); }
+.console-connection {
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+}
+.conn-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--unknown); transition: background 0.3s;
+}
+.conn-dot.live { background: var(--pass); box-shadow: 0 0 8px var(--pass); animation: pulse-dot 2s infinite; }
+.conn-dot.stale { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+.conn-dot.error { background: var(--fail); }
+
+.console-filters {
+  padding: 8px 12px; background: var(--bg-deep); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  padding: 3px 10px; font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  border-radius: 12px; border: 1px solid var(--border); background: transparent;
+  color: var(--text-secondary); cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.filter-btn.on { background: var(--cyan-glow); color: var(--cyan); border-color: rgba(0,245,255,0.4); }
+.console-scroll-wrap {
+  flex: 1; overflow-y: auto; padding: 8px 4px;
+  background: var(--bg-void);
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+}
+
+/* ===== EVENT ROWS ===== */
+.event-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 6px 12px; border-radius: 4px; margin-bottom: 2px;
+  border-left: 2px solid transparent;
+  transition: background 0.1s;
+  cursor: pointer;
+}
+.event-row:hover { background: var(--bg-hover); }
+.event-row.lvl-INFO    { border-left-color: #1a3060; }
+.event-row.lvl-SUCCESS { border-left-color: var(--pass); background: var(--pass-bg); }
+.event-row.lvl-WARN    { border-left-color: var(--warn); background: var(--warn-bg); }
+.event-row.lvl-ERROR   { border-left-color: var(--fail); background: var(--fail-bg); }
+
+.event-ts { color: var(--text-dim); font-size: 11px; flex-shrink: 0; width: 100px; }
+.event-type {
+  font-size: 10px; letter-spacing: 1px; padding: 1px 7px; border-radius: 3px;
+  border: 1px solid transparent; flex-shrink: 0; min-width: 180px; text-align: center;
+}
+.etype-JOB_ACCEPTED                  { color: var(--cyan);    border-color: rgba(0,245,255,0.3); background: rgba(0,245,255,0.05); }
+.etype-TARGET_DISCOVERY_COMPLETED    { color: var(--blue-bright); border-color: rgba(51,153,255,0.3); background: rgba(51,153,255,0.05); }
+.etype-POLICY_VALIDATION_COMPLETED   { color: var(--cyan-dim); border-color: rgba(0,184,196,0.3); background: rgba(0,184,196,0.05); }
+.etype-ASSESSMENT_STARTED            { color: var(--text-secondary); border-color: var(--border); }
+.etype-CONTROL_ASSESSMENT_COMPLETED  { color: var(--text-primary); border-color: var(--border); }
+.etype-STATE_CAPTURE_STARTED         { color: var(--magenta);  border-color: rgba(204,0,255,0.3); background: rgba(204,0,255,0.05); }
+.etype-STATE_CAPTURE_COMPLETED       { color: var(--magenta);  border-color: rgba(204,0,255,0.3); background: rgba(204,0,255,0.05); }
+.etype-ACTION_STARTED                { color: var(--amber);    border-color: rgba(255,170,0,0.3);  background: rgba(255,170,0,0.05); }
+.etype-COMMAND_STARTED               { color: var(--amber-dim);border-color: rgba(204,136,0,0.3); background: rgba(204,136,0,0.05); }
+.etype-COMMAND_COMPLETED             { color: var(--amber);    border-color: rgba(255,170,0,0.3); }
+.etype-VERIFICATION_STARTED          { color: var(--blue-bright); border-color: rgba(51,153,255,0.3); }
+.etype-VERIFICATION_COMPLETED        { color: var(--blue-bright); border-color: rgba(51,153,255,0.3); }
+.etype-JOB_COMPLETED                 { color: var(--pass);     border-color: rgba(0,255,136,0.4); background: rgba(0,255,136,0.08); }
+.etype-JOB_FAILED                    { color: var(--fail);     border-color: rgba(255,51,85,0.4);  background: rgba(255,51,85,0.08); }
+.etype-JOB_BLOCKED                   { color: var(--error);    border-color: rgba(255,102,0,0.4);  background: rgba(255,102,0,0.08); }
+.etype-FINDING_CREATED               { color: var(--warn);     border-color: rgba(255,170,0,0.3);  background: rgba(255,170,0,0.05); }
+
+.event-msg { flex: 1; color: var(--text-primary); line-height: 1.4; }
+.event-ctrl { color: var(--cyan-dim); font-size: 10px; flex-shrink: 0; }
+.event-dur  { color: var(--text-dim); font-size: 10px; flex-shrink: 0; }
+
+/* Event detail expand */
+.event-detail {
+  display: none; margin: 4px 0 4px 110px;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 4px; padding: 8px 12px;
+  font-size: 11px; color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+.event-row.expanded + .event-detail { display: block; }
+
+/* ===== EMPTY STATES ===== */
+.empty-state {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--text-dim); gap: 12px;
+  padding: 40px;
+}
+.empty-icon {
+  width: 48px; height: 48px; opacity: 0.3;
+}
+.empty-title {
+  font-family: 'Orbitron', monospace; font-size: 13px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--text-secondary);
+}
+.empty-sub { font-size: 12px; text-align: center; max-width: 320px; line-height: 1.6; }
+
+/* ===== LOADING OVERLAY ===== */
+.scan-overlay {
+  display: none; position: absolute; inset: 0;
+  background: rgba(3,5,16,0.85); z-index: 50;
+  flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+}
+.scan-overlay.active { display: flex; }
+.scan-spinner {
+  width: 60px; height: 60px;
+  border: 2px solid var(--border);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.scan-label {
+  font-family: 'Orbitron', monospace; font-size: 13px; letter-spacing: 3px;
+  color: var(--cyan); text-shadow: 0 0 15px rgba(0,245,255,0.5);
+}
+.scan-sublabel {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ===== FINDINGS PANEL FADE-IN ===== */
+@keyframes row-appear {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.finding-row { animation: row-appear 0.25s ease-out both; }
+
+/* ===== NOTIFICATION TOAST ===== */
+#toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 18px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  z-index: 9999; min-width: 250px;
+  box-shadow: var(--shadow-panel);
+  transform: translateY(80px); opacity: 0;
+  transition: all 0.3s cubic-bezier(.22,1,.36,1);
+  display: flex; align-items: center; gap: 10px;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.success { border-color: rgba(0,255,136,0.4); color: var(--pass); }
+#toast.error   { border-color: rgba(255,51,85,0.4);  color: var(--fail); }
+#toast.info    { border-color: rgba(0,245,255,0.3);  color: var(--cyan); }
+
+/* ===== GRID BACKGROUND TEXTURE ===== */
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0,245,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,245,255,0.015) 1px, transparent 1px);
+  background-size: 32px 32px;
+  z-index: 0;
+}
+#app { position: relative; z-index: 1; }
+
+/* ===== RESPONSIVE REDUCED MOTION ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
 </head>
-<body class="text-gray-800 h-screen w-screen overflow-hidden flex flex-col" style="background-color: var(--content-gray);">
 
-    <header class="h-16 flex-none border-b border-blue-800 flex items-center justify-between px-6 z-20" style="background-color: var(--header-blue);">
-        <div class="flex items-center gap-4">
-            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded flex items-center justify-center font-bold text-white border border-blue-400">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-            </div>
-            <div>
-                <h1 class="text-white font-bold tracking-widest text-lg">SENTINELX</h1>
-                <p class="text-xs text-blue-200 tracking-wider">Hardening Tool</p>
-            </div>
-        </div>
-        <div class="flex items-center gap-6">
-            <div class="text-right">
-                <div class="text-xs text-blue-200 uppercase">OS:</div>
-                <div id="os-display" class="text-white font-mono font-bold uppercase tracking-wider">DETECTING...</div>
-            </div>
-            <div class="h-8 w-px bg-blue-700"></div>
-            <!-- <div class="flex items-center gap-2">
-                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span class="text-xs font-mono text-green-500">AGENT ONLINE</span>
-            </div> -->
-        </div>
-    </header>
+<body>
+<div id="app">
 
-    <div class="flex-1 grid grid-cols-12 overflow-hidden h-full" style="background-color: var(--content-gray);">
-        
-        <div class="col-span-3 border-r p-6 flex flex-col relative h-full overflow-y-auto" style="background-color: var(--card-bg); border-color: var(--border-color);">
-            
-            <div class="mb-10 text-center relative flex-none">
-                <div class="w-48 h-48 rounded-full border-8 mx-auto flex items-center justify-center relative" style="border-color: var(--border-color); background-color: var(--content-gray);">
-                    <svg class="w-full h-full absolute transform -rotate-90">
-                        <circle id="progress-ring" cx="96" cy="96" r="88" stroke="currentColor" stroke-width="8" fill="transparent" class="text-orange-500 transition-all duration-1000" stroke-dasharray="552" stroke-dashoffset="552" />
-                    </svg>
-                    <div class="z-10 flex flex-col">
-                        <span id="score-text" class="text-5xl font-bold tracking-tighter" style="color: var(--accent-orange);">0%</span>
-                        <span class="text-xs uppercase mt-1 tracking-widest" style="color: var(--text-secondary);">Compliance</span>
-                    </div>
-                </div>
-                <div class="mt-6 border-t pt-6" style="border-color: var(--border-color);">
-                    <button onclick="resetSystem()" class="w-full py-3 bg-transparent border text-red-600 hover:bg-red-50 hover:text-red-700 font-bold text-xs uppercase tracking-widest rounded transition-all" style="border-color: #dc2626;">
-                        ⚠️ RESET TO DEFAULTS
-                    </button>
-                    <p class="text-[10px] text-center mt-2" style="color: var(--text-secondary);">Undoes all changes made by this tool</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3 mb-8 flex-none">
-                <div class="border p-3 rounded" style="background-color: var(--content-gray); border-color: var(--border-color);">
-                    <div class="text-xs uppercase" style="color: var(--text-secondary);">Passing</div>
-                    <div id="count-pass" class="text-2xl font-mono font-bold" style="color: var(--text-primary);">0</div>
-                </div>
-                <div class="border p-3 rounded" style="background-color: var(--content-gray); border-color: #fca5a5;">
-                    <div class="text-xs uppercase" style="color: var(--text-secondary);">Critical Fails</div>
-                    <div id="count-fail" class="text-2xl font-mono text-red-600 font-bold">0</div>
-                </div>
-            </div>
-
-            <div class="mb-auto flex-none">
-                <label class="text-xs uppercase mb-2 block" style="color: var(--text-secondary);">Hardening Profile</label>
-                <select id="profile-select" class="w-full border rounded px-3 py-2" style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-primary);">
-                    <option value="strict">Strict</option>
-                    <option value="moderate">Moderate</option>
-                    <option value="basic">Basic</option>
-                </select>
-            </div>
-
-            <button onclick="startScan()" id="btn-scan" class="flex-none mt-4 w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg uppercase tracking-widest rounded shadow-lg transition-all transform active:scale-95 border border-orange-600">
-                MODERATE LEVEL SCAN
-            </button>
-            <p class="flex-none text-[10px] text-center mt-3 font-mono" style="color: var(--text-secondary);">ID: SIH-2025-FINAL-BUILD</p>
-        </div>
-
-        <div class="col-span-9 flex flex-col relative h-full overflow-hidden" style="background-color: var(--content-gray);">
-            <div class="absolute inset-0 pointer-events-none opacity-5" style="background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);"></div>
-
-            <div class="h-12 flex-none border-b flex items-center justify-between px-6 z-10" style="background-color: var(--card-bg); border-color: var(--border-color);">
-                <h2 class="text-sm font-bold uppercase tracking-widest" style="color: var(--text-primary);">System Hardening & Compliance</h2>
-                <div class="flex gap-2 text-xs font-mono">
-                    <button onclick="downloadReport()" class="px-3 py-1 rounded transition hover:bg-gray-100 border" style="background-color: var(--content-gray); border-color: var(--border-color); color: var(--text-primary);">
-                        EXPORT PDF
-                    </button>
-                    <button class="px-3 py-1 rounded transition hover:bg-gray-100 border" style="background-color: var(--content-gray); border-color: var(--border-color); color: var(--text-primary);">VIEW HISTORY</button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-12 px-6 py-2 text-xs font-mono uppercase border-b flex-none z-10" style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-secondary);">
-                <div class="col-span-2">Rule ID</div>
-                <div class="col-span-6">Description</div>
-                <div class="col-span-2">Severity</div>
-                <div class="col-span-2 text-right">Status</div>
-            </div>
-
-            <div id="audit-logs" class="flex-1 overflow-y-auto p-4 space-y-1 font-mono text-sm relative" style="background-color: var(--content-gray);">
-                <div id="empty-state" class="absolute inset-0 flex items-center justify-center flex-col" style="color: var(--text-secondary);">
-                    <svg class="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    <p class="uppercase tracking-widest text-xs">Waiting for Command</p>
-                </div>
-            </div>
-        </div>
+  <!-- ===== TOP BAR ===== -->
+  <header id="topbar">
+    <div class="topbar-brand">
+      <div class="brand-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#030510" stroke-width="2.5">
+          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.5C17.25 22.15 21 17.25 21 12V7L12 2z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">SENTINELX</div>
+        <div class="brand-sub">Security Hardening Console &nbsp;v3.0</div>
+      </div>
     </div>
 
-    <script>
-        const fixedSessionIds = new Set();
+    <div class="topbar-center">
+      <div class="topbar-stat">
+        <div class="topbar-stat-label">Target</div>
+        <div class="topbar-stat-value" id="hdr-os">—</div>
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-stat">
+        <div class="topbar-stat-label">Kernel</div>
+        <div class="topbar-stat-value" id="hdr-kernel" style="font-size:11px">—</div>
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-stat">
+        <div class="topbar-stat-label">Hostname</div>
+        <div class="topbar-stat-value" id="hdr-host" style="font-size:11px">—</div>
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-stat">
+        <div class="topbar-stat-label">Support</div>
+        <div class="topbar-stat-value" id="hdr-support" style="font-size:11px">—</div>
+      </div>
+    </div>
 
-        fetch('/api/status').then(r => r.json()).then(data => {
-            document.getElementById('os-display').innerText = data.os;
-        });
+    <div class="topbar-right">
+      <div class="connection-status">
+        <div class="status-dot" id="conn-dot"></div>
+        <span id="conn-label" style="color:var(--pass)">ONLINE</span>
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-time" id="clock">—</div>
+    </div>
+  </header>
 
-        function startScan() {
-            const btn = document.getElementById('btn-scan');
-            const logs = document.getElementById('audit-logs');
-            const empty = document.getElementById('empty-state');
-            
-            // NEW: Get the selected profile
-            const profile = document.getElementById('profile-select').value;
+  <!-- ===== SIDEBAR ===== -->
+  <nav id="sidebar">
+    <div class="score-ring-wrap">
+      <div class="score-ring">
+        <svg width="110" height="110" viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r="48" fill="none" stroke="rgba(0,245,255,0.08)" stroke-width="6"/>
+          <circle id="score-circle" cx="55" cy="55" r="48" fill="none"
+            stroke="var(--cyan)" stroke-width="6"
+            stroke-dasharray="301.6" stroke-dashoffset="301.6"
+            stroke-linecap="round"
+            style="transition:stroke-dashoffset 1s ease;"/>
+        </svg>
+        <div class="score-ring-text">
+          <div class="score-num" id="score-pct">0%</div>
+          <div class="score-label">Compliance</div>
+        </div>
+      </div>
+    </div>
 
-            if(empty) empty.style.display = 'none';
-            btn.innerHTML = `<span class="animate-pulse">SCANNING (${profile.toUpperCase()})...</span>`;
-            
-            if(logs.innerHTML.includes("Waiting")) {
-                logs.innerHTML = `<div class="animate-pulse font-mono p-4" style="color: var(--accent-blue);">> Initializing Policy Engine [${profile}]...</div>`;
-            }
-            
-            // NEW: Send profile to backend
-            fetch(`/api/scan?level=${profile}`)
-            .then(r => r.json())
-            .then(data => {
-                renderTable(data.results);
-                btn.innerText = "SCAN COMPLETE";
-            });
-        }
+    <div class="stats-row" style="padding:0 16px 8px">
+      <div class="stat-card">
+        <div class="stat-card-label">Passing</div>
+        <div class="stat-card-value" id="cnt-pass" style="color:var(--pass)">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Failed</div>
+        <div class="stat-card-value" id="cnt-fail" style="color:var(--fail)">0</div>
+      </div>
+    </div>
+    <div class="stats-row" style="padding:0 16px 12px">
+      <div class="stat-card">
+        <div class="stat-card-label">Error</div>
+        <div class="stat-card-value" id="cnt-err" style="color:var(--error);font-size:16px">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Total</div>
+        <div class="stat-card-value" id="cnt-total" style="font-size:16px">0</div>
+      </div>
+    </div>
 
-        function renderTable(results) {
-            const container = document.getElementById('audit-logs');
-            let html = '';
-            let pass = 0, fail = 0;
+    <div class="sidebar-section-label">Navigation</div>
+    <div class="nav-item active" onclick="showPanel('findings')" id="nav-findings">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      Security Findings
+      <span class="nav-badge" id="nav-badge-fail" style="display:none">0</span>
+    </div>
+    <div class="nav-item" onclick="showPanel('console')" id="nav-console">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+      </svg>
+      Live Operations
+    </div>
 
-            // --- NEW: SORT LOGIC (Critical First) ---
-            const severityRank = { "Critical": 0, "High": 1, "Medium": 2, "Low": 3 };
-            
-            results.sort((a, b) => {
-                // First sort by Status (FAIL first)
-                if (a.status !== b.status) return a.status === 'FAIL' ? -1 : 1;
-                // Then sort by Severity
-                return (severityRank[a.severity] || 4) - (severityRank[b.severity] || 4);
-            });
+    <div class="sidebar-controls">
+      <label style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-secondary);font-family:'JetBrains Mono',monospace;display:block;margin-bottom:6px">Profile</label>
+      <select class="profile-select" id="profile-select">
+        <option value="strict">STRICT — All Controls</option>
+        <option value="moderate">MODERATE — Critical/High/Med</option>
+        <option value="basic">BASIC — Critical/High Only</option>
+      </select>
+      <button class="btn-scan" id="btn-scan" onclick="startScan()">
+        ⬡ INITIATE SCAN
+      </button>
+      <button class="btn-reset" onclick="resetSystem()">⚠ RESET ALL CHANGES</button>
+      <div style="text-align:center;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim)">ID · SIH-2025-FINAL</div>
+    </div>
+  </nav>
 
-            results.forEach((item, index) => {
-                const isFail = item.status === 'FAIL';
-                if(isFail) fail++; else pass++;
-                
-                const delay = Math.min(index * 30, 2000); // Cap animation delay for 100+ rules
+  <!-- ===== MAIN CONTENT ===== -->
+  <main id="main">
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <div class="tab active" id="tab-findings" onclick="showTab('findings')">Findings</div>
+      <div class="tab" id="tab-console"  onclick="showTab('console')">Live Console</div>
+      <div class="tab-actions">
+        <button class="btn-sm" onclick="downloadReport()">⬇ Export PDF</button>
+      </div>
+    </div>
 
-                let actionBtn = '';
-                if (isFail) {
-                    actionBtn = `<button onclick="fixIssue('${item.id}')" class="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded shadow-md font-bold tracking-wider transition-all hover:scale-105">FIX ISSUE</button>`;
-                } else if (fixedSessionIds.has(item.id)) {
-                    actionBtn = `<button onclick="rollbackIssue('${item.id}')" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded border border-gray-300 transition-all hover:scale-105">UNDO CHANGE</button>`;
-                } else {
-                    actionBtn = `<span class="text-green-600 font-bold flex items-center justify-end gap-1 text-xs tracking-wider"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> SECURE</span>`;
-                }
+    <!-- Relative wrapper for overlay -->
+    <div style="position:relative;flex:1;display:flex;flex-direction:column;overflow:hidden">
 
-                html += `
-                <div class="grid grid-cols-12 px-4 py-3 rounded border items-center hover:bg-gray-50 transition mb-1 animate-fade-in" style="animation-delay: ${delay}ms; background-color: var(--card-bg); border-color: var(--border-color);">
-                    <div class="col-span-2 text-xs font-mono truncate" style="color: var(--text-secondary);" title="${item.id}">${item.id}</div>
-                    <div class="col-span-6 font-sans font-medium text-sm truncate" style="color: var(--text-primary);" title="${item.name}">${item.name}</div>
-                    <div class="col-span-2">
-                        <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${isFail ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">
-                            ${item.severity}
-                        </span>
-                    </div>
-                    <div class="col-span-2 text-right">
-                        ${actionBtn}
-                    </div>
-                </div>`;
-            });
+      <!-- Scan overlay -->
+      <div class="scan-overlay" id="scan-overlay">
+        <div class="scan-spinner"></div>
+        <div class="scan-label" id="scan-overlay-label">SCANNING…</div>
+        <div class="scan-sublabel" id="scan-overlay-sub">Initializing policy engine</div>
+      </div>
 
-            container.innerHTML = html;
-            updateStats(pass, fail);
-        }
+      <!-- ===== FINDINGS PANEL ===== -->
+      <div class="panel active" id="panel-findings">
+        <div class="findings-wrap">
+          <div class="table-header">
+            <div>Rule ID</div>
+            <div>Description</div>
+            <div>Severity</div>
+            <div>Status</div>
+            <div style="text-align:right">Action</div>
+          </div>
+          <div class="table-body" id="findings-body">
+            <div class="empty-state" id="empty-findings">
+              <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.5C17.25 22.15 21 17.25 21 12V7L12 2z"/>
+              </svg>
+              <div class="empty-title">No Assessment Data</div>
+              <div class="empty-sub">Initiate a scan to assess the security posture of this target against the selected policy profile.</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        function fixIssue(id) {
-            const btn = event.target;
-            btn.innerText = "FIXING...";
-            btn.disabled = true;
+      <!-- ===== LIVE CONSOLE PANEL ===== -->
+      <div class="panel" id="panel-console">
+        <div class="console-wrap">
+          <div class="console-header">
+            <div class="console-job-info">
+              JOB &nbsp;<span class="console-job-id" id="console-job-id">—</span>
+              &nbsp;·&nbsp; <span id="console-event-count">0</span> events
+            </div>
+            <div class="console-connection">
+              <div class="conn-dot" id="conn-stream-dot"></div>
+              <span id="conn-stream-label" style="color:var(--text-secondary)">IDLE</span>
+            </div>
+          </div>
 
-            fetch('/api/fix', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({id: id})
-            })
-            .then(r => r.json())
-            .then(data => {
-                if(data.status === 'fixed') {
-                    fixedSessionIds.add(id);
-                    startScan(); 
-                } else {
-                    alert("Fix Failed: " + data.error);
-                    btn.innerText = "FIX ISSUE";
-                    btn.disabled = false;
-                }
-            });
-        }
+          <div class="console-filters">
+            <span style="font-size:10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;margin-right:4px">FILTER:</span>
+            <button class="filter-btn on"  id="f-all"     onclick="setFilter('all')">ALL</button>
+            <button class="filter-btn"     id="f-success" onclick="setFilter('success')">SUCCESS</button>
+            <button class="filter-btn"     id="f-warn"    onclick="setFilter('warn')">WARN</button>
+            <button class="filter-btn"     id="f-error"   onclick="setFilter('error')">ERROR</button>
+            <button class="filter-btn"     id="f-action"  onclick="setFilter('action')">ACTIONS</button>
+            <div style="margin-left:auto;display:flex;gap:6px">
+              <button class="btn-sm" id="btn-autoscroll" onclick="toggleAutoScroll()" title="Toggle auto-scroll">↓ AUTO</button>
+              <button class="btn-sm" onclick="clearConsole()">✕ CLEAR</button>
+            </div>
+          </div>
 
-        function rollbackIssue(id) {
-            if(!confirm("Are you sure you want to revert this change?")) return;
+          <div class="console-scroll-wrap" id="console-body">
+            <div class="empty-state" id="empty-console">
+              <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+              </svg>
+              <div class="empty-title">No Active Operations</div>
+              <div class="empty-sub">Initiate a scan or fix operation. Real execution events will appear here as they happen.</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-            fetch('/api/rollback', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({id: id})
-            })
-            .then(r => r.json())
-            .then(data => {
-                if(data.status === 'rolled_back') {
-                    fixedSessionIds.delete(id);
-                    startScan();
-                } else {
-                    alert("Rollback Failed: " + data.error);
-                }
-            });
-        }
+    </div><!-- /relative wrapper -->
+  </main>
 
-        function updateStats(pass, fail) {
-            document.getElementById('count-pass').innerText = pass;
-            document.getElementById('count-pass').style.color = 'var(--text-primary)';
-            document.getElementById('count-fail').innerText = fail;
-            
-            const total = pass + fail;
-            const percent = total === 0 ? 0 : Math.round((pass / total) * 100);
-            
-            document.getElementById('score-text').innerText = percent + "%";
-            
-            const circle = document.getElementById('progress-ring');
-            const circumference = 552;
-            const offset = circumference - (percent / 100) * circumference;
-            circle.style.strokeDashoffset = offset;
-            
-            if(percent < 50) {
-                circle.classList.remove('text-orange-500');
-                circle.classList.add('text-red-600');
-            } else {
-                circle.classList.add('text-orange-500');
-                circle.classList.remove('text-red-600');
-            }
-        }
-    function downloadReport() {
-        const profile = document.getElementById('profile-select').value;
-    // Open the URL with the query parameter
-    window.location.href = `/api/export?level=${profile}`;
+</div><!-- /#app -->
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<script>
+// =============================================================================
+// STATE
+// =============================================================================
+const fixedIds   = new Set();   // IDs fixed in this session
+let allResults   = [];          // Last scan results
+let currentJobID = '';          // Active job for SSE
+let evtSource    = null;        // Active EventSource
+let autoScroll   = true;
+let eventFilter  = 'all';
+let eventCount   = 0;
+let allEvents    = [];          // All received events for filter replay
+
+// =============================================================================
+// CLOCK
+// =============================================================================
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
 }
-// 6. MASTER RESET Function
-        function resetSystem() {
-            if(!confirm("WARNING: This will attempt to UNDO ALL changes made by this tool and restore original settings.\n\nAre you sure?")) return;
+setInterval(updateClock, 1000);
+updateClock();
 
-            const btn = event.target;
-            btn.innerText = "RESETTING...";
-            btn.disabled = true;
+// =============================================================================
+// STARTUP — fetch status
+// =============================================================================
+fetch('/api/discovery')
+  .then(r => r.json())
+  .then(d => {
+    document.getElementById('hdr-os').textContent      = (d.os_name || d.os || '—').replace('CentOS Stream','CentOS');
+    document.getElementById('hdr-kernel').textContent  = (d.kernel   || '—').substring(0, 20);
+    document.getElementById('hdr-host').textContent    = d.hostname  || '—';
+    const sup = d.support_status || '—';
+    const supEl = document.getElementById('hdr-support');
+    supEl.textContent = sup;
+    supEl.style.color = sup === 'SUPPORTED' ? 'var(--pass)' : 'var(--warn)';
+  })
+  .catch(() => {
+    document.getElementById('hdr-os').textContent = 'OFFLINE';
+    document.getElementById('conn-dot').style.background = 'var(--fail)';
+    document.getElementById('conn-label').textContent = 'OFFLINE';
+    document.getElementById('conn-label').style.color = 'var(--fail)';
+  });
 
-            fetch('/api/reset', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => {
-                alert(data.message);
-                // Reload page to reflect fresh state
-                window.location.reload();
-            });
-        }
-    </script>
+// =============================================================================
+// NAVIGATION
+// =============================================================================
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  showTab(name);
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navEl = document.getElementById('nav-' + name);
+  if (navEl) navEl.classList.add('active');
+}
+
+// =============================================================================
+// SCAN
+// =============================================================================
+function startScan() {
+  const profile  = document.getElementById('profile-select').value;
+  const btn      = document.getElementById('btn-scan');
+  const overlay  = document.getElementById('scan-overlay');
+
+  btn.disabled = true;
+  btn.classList.add('scanning');
+  btn.textContent = '⬡ SCANNING…';
+  overlay.classList.add('active');
+  document.getElementById('scan-overlay-label').textContent = 'SCANNING…';
+  document.getElementById('scan-overlay-sub').textContent = `Profile: ${profile.toUpperCase()}`;
+
+  clearConsole();
+  showTab('findings');
+  currentJobID = 'job-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  document.getElementById('console-job-id').textContent = currentJobID;
+  localStorage.setItem('sentinelx.lastJobID', currentJobID);
+  startSSE(currentJobID);
+
+  fetch(`/api/scan?level=${encodeURIComponent(profile)}&job_id=${encodeURIComponent(currentJobID)}`)
+    .then(r => r.json())
+    .then(data => {
+      allResults   = data.results || [];
+      currentJobID = data.job_id  || currentJobID;
+
+      // Show findings
+      renderFindings(allResults);
+
+      // Keep the already-open stream; the scan emits events while it runs.
+      if (currentJobID) {
+        document.getElementById('console-job-id').textContent = currentJobID;
+      }
+
+      btn.disabled = false;
+      btn.classList.remove('scanning');
+      btn.textContent = '⬡ INITIATE SCAN';
+      overlay.classList.remove('active');
+      showToast('Scan complete — ' + allResults.length + ' controls assessed', 'info');
+    })
+    .catch(err => {
+      if (evtSource) { evtSource.close(); evtSource = null; }
+      setStreamStatus('stale', 'DISCONNECTED');
+      btn.disabled = false;
+      btn.classList.remove('scanning');
+      btn.textContent = '⬡ INITIATE SCAN';
+      overlay.classList.remove('active');
+      showToast('Scan failed: ' + err.message, 'error');
+    });
+}
+
+// =============================================================================
+// RENDER FINDINGS
+// =============================================================================
+function renderFindings(results) {
+  const body    = document.getElementById('findings-body');
+  const empty   = document.getElementById('empty-findings');
+  const badgeEl = document.getElementById('nav-badge-fail');
+
+  if (!results || results.length === 0) {
+    empty.style.display = 'flex';
+    updateStats(0,0,0,0);
+    return;
+  }
+  empty.style.display = 'none';
+
+  // Sort: FAIL first, then by severity
+  const sevRank = {Critical:0, High:1, Medium:2, Low:3};
+  const statusRank = {FAIL:0, ERROR:1, TIMEOUT:2, UNKNOWN:3, NOT_APPLICABLE:4, PASS:5};
+  results.sort((a,b) => {
+    const sd = (statusRank[a.status]||99) - (statusRank[b.status]||99);
+    if (sd !== 0) return sd;
+    return (sevRank[a.severity]||9) - (sevRank[b.severity]||9);
+  });
+
+  let pass=0, fail=0, err=0;
+  let html = '';
+  results.forEach((item, idx) => {
+    const isFail  = item.status === 'FAIL';
+    const isPass  = item.status === 'PASS';
+    const isErr   = item.status === 'ERROR' || item.status === 'TIMEOUT';
+    if (isPass)  pass++;
+    else if (isFail) fail++;
+    else if (isErr)  err++;
+
+    const rowClass = isFail ? 'is-fail' : isPass ? 'is-pass' : isErr ? 'is-error' : 'is-unknown';
+    const delay    = Math.min(idx * 25, 1500);
+
+    let action = '';
+    if (isFail) {
+      action = `<button class="btn-fix" id="btn-fix-${item.id}" onclick="fixIssue('${item.id}',this)">FIX</button>`;
+    } else if (fixedIds.has(item.id)) {
+      action = `<button class="btn-undo" onclick="rollbackIssue('${item.id}',this)">UNDO</button>`;
+    } else if (isPass) {
+      action = `<span class="secure-tag">✓ SECURE</span>`;
+    }
+
+    html += `
+    <div class="finding-row ${rowClass}" style="animation-delay:${delay}ms">
+      <div class="rule-id" title="${escHtml(item.id)}">${escHtml(item.id)}</div>
+      <div class="rule-name" title="${escHtml(item.name)}">${escHtml(item.name)}</div>
+      <div><span class="sev-badge sev-${escHtml(item.severity)}">${escHtml(item.severity)}</span></div>
+      <div><span class="status-badge status-${escHtml(item.status)}">${escHtml(item.status)}</span></div>
+      <div class="action-cell">${action}</div>
+    </div>`;
+  });
+
+  body.innerHTML = html;
+
+  const failCount = fail;
+  badgeEl.textContent = failCount;
+  badgeEl.style.display = failCount > 0 ? 'inline-flex' : 'none';
+
+  updateStats(pass, fail, err, results.length);
+}
+
+function updateStats(pass, fail, err, total) {
+  document.getElementById('cnt-pass').textContent  = pass;
+  document.getElementById('cnt-fail').textContent  = fail;
+  document.getElementById('cnt-err').textContent   = err;
+  document.getElementById('cnt-total').textContent = total;
+
+  const pct  = total === 0 ? 0 : Math.round((pass / total) * 100);
+  const circ = 301.6;
+  const off  = circ - (pct / 100) * circ;
+
+  document.getElementById('score-pct').textContent    = pct + '%';
+  document.getElementById('score-circle').style.strokeDashoffset = off;
+
+  const color = pct >= 80 ? 'var(--pass)' : pct >= 50 ? 'var(--warn)' : 'var(--fail)';
+  document.getElementById('score-circle').style.stroke = color;
+  document.getElementById('score-pct').style.color     = color;
+}
+
+// =============================================================================
+// FIX
+// =============================================================================
+function fixIssue(id, btn) {
+  btn.textContent = 'FIXING…';
+  btn.disabled    = true;
+
+  const jobID = 'fix-' + id + '-' + Date.now();
+  currentJobID = jobID;
+  document.getElementById('console-job-id').textContent = jobID;
+  clearConsole();
+  showTab('console');
+  startSSE(jobID);
+
+  fetch('/api/fix', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({id, job_id: jobID})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'fixed') {
+      fixedIds.add(id);
+      showToast('Fixed: ' + id, 'success');
+      startScan();
+    } else {
+      showToast('Fix failed: ' + (data.error || '?'), 'error');
+      btn.textContent = 'FIX';
+      btn.disabled    = false;
+    }
+  })
+  .catch(err => {
+    showToast('Fix error: ' + err.message, 'error');
+    btn.textContent = 'FIX';
+    btn.disabled    = false;
+  });
+}
+
+// =============================================================================
+// ROLLBACK
+// =============================================================================
+function rollbackIssue(id, btn) {
+  if (!confirm('Revert the change made to control ' + id + '?\n\nThis will attempt to restore the previous system state.')) return;
+  btn.textContent = 'REVERTING…';
+  btn.disabled    = true;
+  const jobID = 'recovery-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  currentJobID = jobID;
+  document.getElementById('console-job-id').textContent = jobID;
+  localStorage.setItem('sentinelx.lastJobID', jobID);
+  clearConsole();
+  showTab('console');
+  startSSE(jobID);
+
+  fetch('/api/rollback', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({id, job_id: jobID})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'rollback_applied_unverified') {
+      fixedIds.delete(id);
+      showToast('Rollback applied; state not independently verified: ' + id, 'info');
+      startScan();
+    } else {
+      showToast('Rollback failed: ' + (data.error || '?'), 'error');
+      btn.textContent = 'UNDO';
+      btn.disabled    = false;
+    }
+  });
+}
+
+// =============================================================================
+// RESET
+// =============================================================================
+function resetSystem() {
+  if (!confirm('RESET ALL CHANGES\n\nThis will attempt to revert every change made by this tool.\n\nProceed?')) return;
+  fetch('/api/reset', {method:'POST'})
+    .then(r => r.json())
+    .then(data => { showToast(data.message || 'Reset complete', 'info'); startScan(); });
+}
+
+// =============================================================================
+// REPORT
+// =============================================================================
+function downloadReport() {
+  const profile = document.getElementById('profile-select').value;
+  window.location.href = `/api/export?level=${encodeURIComponent(profile)}`;
+}
+
+// =============================================================================
+// SSE LIVE CONSOLE
+// =============================================================================
+function startSSE(jobID) {
+  if (evtSource) { evtSource.close(); evtSource = null; }
+
+  setStreamStatus('connecting', 'CONNECTING');
+  evtSource = new EventSource(`/api/events/stream?job=${encodeURIComponent(jobID)}`);
+
+  evtSource.addEventListener('job_event', e => {
+    try {
+      const ev = JSON.parse(e.data);
+      appendEvent(ev);
+    } catch {}
+  });
+
+  evtSource.onopen = () => setStreamStatus('live', 'LIVE');
+  evtSource.onerror = () => {
+    setStreamStatus('stale', 'RECONNECTING');
+  };
+}
+
+function loadEventHistory(jobID) {
+  fetch(`/api/events/history?job=${encodeURIComponent(jobID)}&limit=200`)
+    .then(r => r.json())
+    .then(data => {
+      (data.events || []).forEach(ev => appendEvent(ev, true));
+    })
+    .catch(() => {});
+}
+
+function restoreLastJob() {
+  const jobID = localStorage.getItem('sentinelx.lastJobID');
+  if (!jobID) return;
+  currentJobID = jobID;
+  document.getElementById('console-job-id').textContent = jobID;
+  startSSE(jobID);
+}
+
+function setStreamStatus(state, label) {
+  const dot = document.getElementById('conn-stream-dot');
+  const lbl = document.getElementById('conn-stream-label');
+  dot.className = 'conn-dot ' + state;
+  lbl.textContent = label;
+  lbl.style.color = state === 'live' ? 'var(--pass)' : state === 'stale' ? 'var(--warn)' : 'var(--text-secondary)';
+}
+
+// =============================================================================
+// EVENT RENDERING
+// =============================================================================
+function appendEvent(ev, isHistory) {
+  // Dedup by event_id
+  if (ev.event_id && allEvents.find(e => e.event_id === ev.event_id)) return;
+  allEvents.push(ev);
+
+  if (['JOB_COMPLETED','JOB_FAILED','JOB_BLOCKED'].includes(ev.event_type)) {
+    if (evtSource) { evtSource.close(); evtSource = null; }
+    setStreamStatus('', 'COMPLETE');
+  }
+
+  const body = document.getElementById('console-body');
+  const empty = document.getElementById('empty-console');
+  if (empty) empty.style.display = 'none';
+
+  if (!shouldShowEvent(ev)) {
+    eventCount++;
+    document.getElementById('console-event-count').textContent = eventCount;
+    return;
+  }
+
+  eventCount++;
+  document.getElementById('console-event-count').textContent = eventCount;
+
+  const row = buildEventRow(ev);
+  body.appendChild(row);
+
+  if (autoScroll) body.scrollTop = body.scrollHeight;
+}
+
+function buildEventRow(ev) {
+  const ts = new Date(ev.timestamp);
+  const tsStr = ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:2});
+
+  const etypeClass = 'etype-' + (ev.event_type || '');
+  const lvlClass   = 'lvl-'  + (ev.level || 'INFO');
+
+  const ctrl   = ev.control_id  ? `<span class="event-ctrl">[${escHtml(ev.control_id)}]</span>` : '';
+  const dur    = ev.duration_ms ? `<span class="event-dur">${ev.duration_ms}ms</span>` : '';
+  const status = ev.status      ? ` <span class="status-badge status-${escHtml(ev.status)}" style="font-size:10px;padding:1px 5px">${escHtml(ev.status)}</span>` : '';
+
+  const row = document.createElement('div');
+  row.className = `event-row ${lvlClass}`;
+  row.setAttribute('data-level', ev.level || '');
+  row.setAttribute('data-type',  ev.event_type || '');
+
+  row.innerHTML = `
+    <span class="event-ts">${tsStr}</span>
+    <span class="event-type ${etypeClass}">${escHtml(ev.event_type || '')}</span>
+    <span class="event-msg">${escHtml(ev.message || '')}${status}</span>
+    ${ctrl}${dur}`;
+
+  // Click to expand details
+  if (ev.details) {
+    row.addEventListener('click', () => {
+      row.classList.toggle('expanded');
+      let detail = row.nextElementSibling;
+      if (detail && detail.classList.contains('event-detail')) {
+        detail.style.display = row.classList.contains('expanded') ? 'block' : 'none';
+      } else {
+        detail = document.createElement('div');
+        detail.className = 'event-detail';
+        detail.textContent = JSON.stringify(ev.details, null, 2);
+        row.parentNode.insertBefore(detail, row.nextSibling);
+      }
+    });
+  }
+
+  return row;
+}
+
+// =============================================================================
+// FILTER
+// =============================================================================
+function setFilter(f) {
+  eventFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('on'));
+  const fEl = document.getElementById('f-' + f);
+  if (fEl) fEl.classList.add('on');
+
+  // Re-render from stored events
+  const body = document.getElementById('console-body');
+  const empty = document.getElementById('empty-console');
+  body.innerHTML = '';
+  if (empty) body.appendChild(empty);
+  eventCount = 0;
+  allEvents.forEach(ev => {
+    if (shouldShowEvent(ev)) {
+      eventCount++;
+      body.appendChild(buildEventRow(ev));
+    }
+  });
+  document.getElementById('console-event-count').textContent = eventCount;
+  if (autoScroll) body.scrollTop = body.scrollHeight;
+}
+
+function shouldShowEvent(ev) {
+  if (eventFilter === 'all')     return true;
+  if (eventFilter === 'success') return ev.level === 'SUCCESS';
+  if (eventFilter === 'warn')    return ev.level === 'WARN' || ev.level === 'ERROR';
+  if (eventFilter === 'error')   return ev.level === 'ERROR';
+  if (eventFilter === 'action')  return ['ACTION_STARTED','COMMAND_STARTED','COMMAND_COMPLETED',
+    'STATE_CAPTURE_STARTED','STATE_CAPTURE_COMPLETED',
+    'VERIFICATION_STARTED','VERIFICATION_COMPLETED',
+    'JOB_COMPLETED','JOB_FAILED','JOB_BLOCKED'].includes(ev.event_type);
+  return true;
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+function clearConsole() {
+  const body  = document.getElementById('console-body');
+  const empty = document.getElementById('empty-console');
+  body.innerHTML = '';
+  body.appendChild(empty);
+  empty.style.display = 'flex';
+  allEvents  = [];
+  eventCount = 0;
+  document.getElementById('console-event-count').textContent = '0';
+  setStreamStatus('', 'IDLE');
+}
+
+function toggleAutoScroll() {
+  autoScroll = !autoScroll;
+  const btn = document.getElementById('btn-autoscroll');
+  btn.style.color = autoScroll ? 'var(--cyan)' : 'var(--text-secondary)';
+  btn.style.borderColor = autoScroll ? 'var(--border-hover)' : 'var(--border)';
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+let toastTimer;
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'show ' + (type || 'info');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+restoreLastJob();
+</script>
 </body>
 </html>

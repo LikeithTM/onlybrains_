@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"sih2025/internal/dag"
+	"sih2025/internal/events"
 	"sih2025/internal/platform"
 	"sih2025/internal/policy"
 	"sih2025/internal/state"
@@ -30,33 +31,26 @@ const (
 
 // AuditResult holds the result of a single control assessment.
 type AuditResult struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Severity string `json:"severity"`
-	Status   string `json:"status"`
-	Actual   string `json:"actual"`
-	Expected string `json:"expected"`
-	// EvidenceDigest is the SHA-256 of the assessed actual value,
-	// providing a tamper-evident reference in reports.
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Severity       string `json:"severity"`
+	Status         string `json:"status"`
+	Actual         string `json:"actual"`
+	Expected       string `json:"expected"`
 	EvidenceDigest string `json:"evidence_digest,omitempty"`
 }
 
-// evidenceDigest computes a short SHA-256 hex of the actual value for audit linkage.
 func evidenceDigest(actual string) string {
 	h := sha256.Sum256([]byte(actual))
 	return hex.EncodeToString(h[:])[:16]
 }
 
-// --- HELPER: Get Raw System Value (The "Smart Split" Fix) ---
 func getRawSystemValue(worker platform.HardenerInterface, cmd string, args []string) string {
-	// 1. Intelligent Command Splitting
 	realCmd := cmd
-	// Remove pipe logic to run the raw data gatherer (e.g. 'sysctl ...' without '| grep')
 	if strings.Contains(cmd, "|") {
 		parts := strings.Split(cmd, "|")
 		realCmd = strings.TrimSpace(parts[0])
 	}
-	// Handle 'bash -c' wrappers
 	if len(args) > 1 && args[0] == "-c" {
 		inner := args[1]
 		if strings.Contains(inner, "|") {
@@ -66,25 +60,20 @@ func getRawSystemValue(worker platform.HardenerInterface, cmd string, args []str
 		}
 	}
 
-	// 2. Execute
 	success, output, err := worker.RunCommand(realCmd, args, "")
 	output = strings.TrimSpace(output)
 
-	// 3. Smart Error Handling
 	if !success || err != nil {
-		// If it's a grep/find command that failed, it means the setting is missing
 		if strings.Contains(cmd, "grep") || strings.Contains(cmd, "find") {
 			if output == "" {
 				return "Not Configured"
 			}
 		}
-		// If sysctl failed, the key likely doesn't exist
 		if strings.Contains(cmd, "sysctl") {
 			if output == "" {
 				return "Key Missing in Kernel"
 			}
 		}
-		// Check for specific exit code 1 (Command not found vs Data not found)
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if exitErr.ExitCode() == 1 && output == "" {
 				return "Not Set"
@@ -95,19 +84,12 @@ func getRawSystemValue(worker platform.HardenerInterface, cmd string, args []str
 	if output == "" {
 		return "Empty / Not Set"
 	}
-
-	// Clean up "fail" echoes from JSON checks
 	if strings.Contains(strings.ToLower(output), "fail") {
 		return "Vulnerable Config"
 	}
-
 	return output
 }
 
-// filterRulesForPlatform returns only rules that match the given platform name
-// (case-insensitive). Rules with an empty platform field are treated as universal
-// and are included for all platforms.
-// This is the fix for Gap 1: Ubuntu rules must not run on CentOS.
 func filterRulesForPlatform(rules []policy.Rule, platformName string) []policy.Rule {
 	filtered := make([]policy.Rule, 0, len(rules))
 	lowerPlatform := strings.ToLower(platformName)
@@ -120,25 +102,19 @@ func filterRulesForPlatform(rules []policy.Rule, platformName string) []policy.R
 	return filtered
 }
 
-// assessRule runs a single rule's check and returns the assessment status and actual value.
-// It correctly distinguishes PASS, FAIL, UNKNOWN, ERROR, and NOT_APPLICABLE.
 func assessRule(worker platform.HardenerInterface, secManager *SecEditManager, r policy.Rule) (status, actual string) {
 	switch r.Type {
 	case "command", "file_check", "file_edit":
 		passed, actualVal, err := worker.RunCommand(r.Check.Cmd, r.Check.Args, r.Check.ExpectPattern)
-
 		if err != nil {
-			// Command itself failed to execute — this is an ERROR, not a FAIL.
 			return StatusERROR, fmt.Sprintf("exec error: %v", err)
 		}
-
 		if !passed {
 			rawVal := getRawSystemValue(worker, r.Check.Cmd, r.Check.Args)
 			if rawVal != "Missing" && rawVal != "fail" {
 				actualVal = rawVal
 			}
 		}
-
 		actualVal = strings.TrimSpace(actualVal)
 		if len(actualVal) > 120 {
 			actualVal = actualVal[:117] + "..."
@@ -146,7 +122,6 @@ func assessRule(worker platform.HardenerInterface, secManager *SecEditManager, r
 		if passed && actualVal == "" {
 			actualVal = "Verified Secure"
 		}
-
 		if passed {
 			return StatusPASS, actualVal
 		}
@@ -178,30 +153,50 @@ func assessRule(worker platform.HardenerInterface, secManager *SecEditManager, r
 	}
 }
 
-// RunAudit executes rules for the given platform, filtering out inapplicable ones.
-// platformName should be "centos", "ubuntu", or "windows".
-// Pass "" to run all rules (legacy behaviour, not recommended).
+// RunAudit is the legacy (no-event) wrapper.
 func RunAudit(pol *policy.Policy) []AuditResult {
 	return RunAuditForPlatform(pol, "")
 }
 
-// RunAuditForPlatform is the platform-aware version of RunAudit.
+// RunAuditForPlatform runs a platform-filtered assessment, emitting structured
+// events into the event bus so the live console can show real progress.
 func RunAuditForPlatform(pol *policy.Policy, platformName string) []AuditResult {
+	return RunAuditForPlatformWithJob(pol, platformName, "")
+}
+
+// RunAuditForPlatformWithJob is the event-producing version.
+// jobID links all events to the live console stream.
+func RunAuditForPlatformWithJob(pol *policy.Policy, platformName, jobID string) []AuditResult {
 	var results []AuditResult
 	var mutex sync.Mutex
+
+	bus := events.GlobalBus
+	emit := func(ev *events.Event) {
+		if jobID != "" {
+			bus.Emit(jobID, ev)
+		}
+	}
+
+	emit(events.New(jobID, "", events.TypeAssessmentStarted, events.LevelInfo,
+		fmt.Sprintf("Assessment started — platform: %s, policy rules: %d", platformName, len(pol.Rules)),
+		map[string]any{"platform": platformName, "rule_count": len(pol.Rules)}))
 
 	worker := platform.GetPlatform()
 	secManager := NewSecEditManager()
 
-	// Apply platform filter before DAG scheduling.
 	rulesToRun := pol.Rules
 	if platformName != "" {
 		rulesToRun = filterRulesForPlatform(pol.Rules, platformName)
 	}
 
+	emit(events.New(jobID, "", events.TypePolicyValidationCompleted, events.LevelInfo,
+		fmt.Sprintf("Policy filtered: %d applicable controls for platform '%s'", len(rulesToRun), platformName),
+		map[string]any{"applicable_count": len(rulesToRun)}))
+
 	layers, err := dag.SortRules(rulesToRun)
 	if err != nil {
-		fmt.Printf("[CRITICAL ERROR] Dependency Cycle: %v\n", err)
+		emit(events.New(jobID, "", events.TypeJobFailed, events.LevelError,
+			fmt.Sprintf("Dependency cycle detected: %v", err), nil))
 		return nil
 	}
 
@@ -211,6 +206,8 @@ func RunAuditForPlatform(pol *policy.Policy, platformName string) []AuditResult 
 			wg.Add(1)
 			go func(r policy.Rule) {
 				defer wg.Done()
+				start := time.Now()
+
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 
@@ -232,6 +229,32 @@ func RunAuditForPlatform(pol *policy.Policy, platformName string) []AuditResult 
 					finalRes = struct{ status, actual string }{StatusTIMEOUT, "Check timed out"}
 				}
 
+				durMs := time.Since(start).Milliseconds()
+
+				lvl := events.LevelInfo
+				if finalRes.status == StatusFAIL {
+					lvl = events.LevelWarn
+				} else if finalRes.status == StatusERROR || finalRes.status == StatusTIMEOUT {
+					lvl = events.LevelError
+				} else if finalRes.status == StatusPASS {
+					lvl = events.LevelSuccess
+				}
+
+				emit(&events.Event{
+					EventID:    fmt.Sprintf("%s-%s-%d", jobID, r.ID, time.Now().UnixNano()),
+					JobID:      jobID,
+					ControlID:  r.ID,
+					EventType:  events.TypeControlAssessmentCompleted,
+					Level:      lvl,
+					Status:     finalRes.status,
+					Message:    fmt.Sprintf("[%s] Assessment completed for %s", finalRes.status, r.Name),
+					DurationMs: durMs,
+					Details: map[string]any{
+						"control_id": r.ID,
+						"severity":   r.Severity,
+					},
+				})
+
 				mutex.Lock()
 				results = append(results, AuditResult{
 					ID:             r.ID,
@@ -247,26 +270,32 @@ func RunAuditForPlatform(pol *policy.Policy, platformName string) []AuditResult 
 		}
 		wg.Wait()
 	}
+
+	pass, fail := 0, 0
+	for _, r := range results {
+		if r.Status == StatusPASS {
+			pass++
+		} else if r.Status == StatusFAIL {
+			fail++
+		}
+	}
+	emit(events.New(jobID, "", events.TypeJobCompleted, events.LevelSuccess,
+		fmt.Sprintf("Assessment complete — PASS: %d, FAIL: %d, Total: %d", pass, fail, len(results)),
+		map[string]any{"pass": pass, "fail": fail, "total": len(results)}))
+
 	return results
 }
 
 // CapturedState holds a structured snapshot of a setting before mutation.
-// This replaces the raw-string approach from the original ApplyFix.
 type CapturedState struct {
 	RuleID    string    `json:"rule_id"`
 	RuleName  string    `json:"rule_name"`
 	CaptureAt time.Time `json:"capture_at"`
-	// StateType describes what was captured: "raw_value", "file_backup", "service_state", etc.
-	StateType string `json:"state_type"`
-	// Value is the captured state as a JSON-serialisable string.
-	Value string `json:"value"`
-	// Digest is the SHA-256 of the value field for tamper evidence.
-	Digest string `json:"digest"`
+	StateType string    `json:"state_type"`
+	Value     string    `json:"value"`
+	Digest    string    `json:"digest"`
 }
 
-// captureState gathers the current system value for a rule before mutation.
-// It stores the result in the DB and returns the CapturedState.
-// If capture fails, it returns an error — the caller must not proceed with mutation.
 func captureState(worker platform.HardenerInterface, rule policy.Rule) (*CapturedState, error) {
 	prevValue := getRawSystemValue(worker, rule.Check.Cmd, rule.Check.Args)
 	if len(prevValue) > 500 {
@@ -283,24 +312,18 @@ func captureState(worker platform.HardenerInterface, rule policy.Rule) (*Capture
 		Digest:    hex.EncodeToString(digest[:]),
 	}
 
-	// Serialise for DB storage.
 	serialised, err := json.Marshal(cs)
 	if err != nil {
 		return nil, fmt.Errorf("state serialisation failed: %v", err)
 	}
 
 	newValue := deriveNewValueLabel(rule)
-
-	// Log to DB — this is the durable record enabling rollback.
 	if err := state.LogAction(rule.ID, rule.Name, string(serialised), newValue); err != nil {
 		return nil, fmt.Errorf("state capture DB write failed: %v", err)
 	}
-
 	return cs, nil
 }
 
-// deriveNewValueLabel extracts a human-readable label for the intended new value.
-// Used only for display and logging — not for execution.
 func deriveNewValueLabel(rule policy.Rule) string {
 	if rule.Remediation.ReplaceText != "" {
 		return strings.TrimSpace(rule.Remediation.ReplaceText)
@@ -334,21 +357,57 @@ func deriveNewValueLabel(rule policy.Rule) string {
 	return "Applied Fix"
 }
 
-// ApplyFix performs remediation for the given rule.
-// It MUST capture state before mutating. If state capture fails, no mutation is performed.
-func ApplyFix(rule policy.Rule) error {
+// ApplyFixWithJob applies a remediation and emits events to the live console.
+func ApplyFixWithJob(rule policy.Rule, jobID string) error {
+	bus := events.GlobalBus
+	emit := func(ev *events.Event) {
+		if jobID != "" {
+			bus.Emit(jobID, ev)
+		}
+	}
+
 	worker := platform.GetPlatform()
 	secManager := NewSecEditManager()
+	if rule.Remediation.Type == "manual" {
+		emit(events.New(jobID, rule.ID, events.TypeJobBlocked, events.LevelWarn,
+			"Manual action required — automated execution is blocked for this control", nil))
+		return fmt.Errorf("manual action required")
+	}
 
-	fmt.Printf("[FIX] Automating Rule: %s\n", rule.ID)
+	// 1. State capture — mandatory before mutation.
+	emit(events.New(jobID, rule.ID, events.TypeStateCaptureStarted, events.LevelInfo,
+		fmt.Sprintf("Capturing pre-change state for %s", rule.ID), nil))
 
-	// --- 1. CAPTURE STATE BEFORE MUTATION (non-optional) ---
-	_, err := captureState(worker, rule)
+	cs, err := captureState(worker, rule)
 	if err != nil {
+		emit(events.New(jobID, rule.ID, events.TypeJobFailed, events.LevelError,
+			fmt.Sprintf("State capture failed — mutation aborted: %v", err), nil))
 		return fmt.Errorf("state capture failed, mutation aborted: %v", err)
 	}
 
-	// --- 2. APPLY ---
+	emit(&events.Event{
+		JobID:     jobID,
+		ControlID: rule.ID,
+		EventType: events.TypeStateCaptureCompleted,
+		Level:     events.LevelInfo,
+		Message:   fmt.Sprintf("Pre-change state captured (digest: %s…)", cs.Digest[:12]),
+		Details:   map[string]any{"digest": cs.Digest, "state_type": cs.StateType},
+	})
+
+	// 2. Execute remediation.
+	emit(events.New(jobID, rule.ID, events.TypeActionStarted, events.LevelInfo,
+		fmt.Sprintf("Executing remediation: type=%s", rule.Remediation.Type),
+		map[string]any{"remediation_type": rule.Remediation.Type}))
+
+	operationEvent := events.TypeActionCompleted
+	if rule.Remediation.Type == "command" {
+		operationEvent = events.TypeCommandCompleted
+		emit(events.New(jobID, rule.ID, events.TypeCommandStarted, events.LevelInfo,
+			"Starting allowlisted operation for control "+rule.ID,
+			map[string]any{"operation_type": rule.Remediation.Type}))
+	}
+
+	start := time.Now()
 	switch rule.Remediation.Type {
 	case "registry":
 		err = worker.SetRegistry(rule.Remediation.RegKey, rule.Remediation.RegValue, rule.Remediation.Value)
@@ -360,47 +419,99 @@ func ApplyFix(rule policy.Rule) error {
 		valStr, _ := rule.Remediation.Value.(string)
 		err = secManager.SetUserRight(rule.Remediation.RegKey, valStr)
 	case "manual":
-		if rule.Remediation.Cmd != "echo" && rule.Remediation.Cmd != "" {
-			_, _, err = worker.RunCommand(rule.Remediation.Cmd, rule.Remediation.Args, "")
-		} else {
-			return fmt.Errorf("manual action required")
-		}
+		return fmt.Errorf("manual action required")
 	default:
+		emit(events.New(jobID, rule.ID, events.TypeJobBlocked, events.LevelWarn,
+			"Unsupported remediation type — no operation was executed", map[string]any{"remediation_type": rule.Remediation.Type}))
 		return fmt.Errorf("unknown remediation type: %s", rule.Remediation.Type)
 	}
 
+	durMs := time.Since(start).Milliseconds()
+
 	if err != nil {
+		emit(&events.Event{
+			JobID:      jobID,
+			ControlID:  rule.ID,
+			EventType:  operationEvent,
+			Level:      events.LevelError,
+			Status:     "FAILED",
+			Message:    fmt.Sprintf("Remediation command failed: %v", err),
+			DurationMs: durMs,
+		})
+		emit(events.New(jobID, rule.ID, events.TypeJobFailed, events.LevelError,
+			fmt.Sprintf("Fix failed for %s: %v", rule.ID, err), nil))
 		return fmt.Errorf("fix failed: %v", err)
 	}
+
+	emit(&events.Event{
+		JobID:      jobID,
+		ControlID:  rule.ID,
+		EventType:  operationEvent,
+		Level:      events.LevelInfo,
+		Status:     "OK",
+		Message:    "Operation completed — checking resulting state",
+		DurationMs: durMs,
+	})
+
+	// 3. Verification — re-read actual state.
+	emit(events.New(jobID, rule.ID, events.TypeVerificationStarted, events.LevelInfo,
+		"Reading effective target configuration to verify outcome", nil))
+
+	verifyStart := time.Now()
+	vStatus, _ := assessRule(worker, secManager, rule)
+	vDurMs := time.Since(verifyStart).Milliseconds()
+
+	if vStatus == StatusPASS {
+		emit(&events.Event{
+			JobID:      jobID,
+			ControlID:  rule.ID,
+			EventType:  events.TypeVerificationCompleted,
+			Level:      events.LevelSuccess,
+			Status:     "VERIFIED",
+			Message:    "Expected state confirmed by verification logic",
+			DurationMs: vDurMs,
+		})
+		emit(events.New(jobID, rule.ID, events.TypeJobCompleted, events.LevelSuccess,
+			fmt.Sprintf("Remediation verified successfully for %s", rule.ID),
+			map[string]any{"control_id": rule.ID, "verification_status": "VERIFIED"}))
+	} else {
+		emit(&events.Event{
+			JobID:      jobID,
+			ControlID:  rule.ID,
+			EventType:  events.TypeVerificationCompleted,
+			Level:      events.LevelWarn,
+			Status:     vStatus,
+			Message:    fmt.Sprintf("Verification did not confirm the expected state — status: %s", vStatus),
+			DurationMs: vDurMs,
+		})
+		emit(events.New(jobID, rule.ID, events.TypeJobFailed, events.LevelError,
+			fmt.Sprintf("Remediation could not be verified — status: %s", vStatus),
+			map[string]any{"verification_status": vStatus}))
+		return fmt.Errorf("remediation was not verified (status: %s)", vStatus)
+	}
+
 	return nil
 }
 
-// RevertFix performs rollback for the given rule.
-// It prefers captured state from the DB over the static rollback definition in the policy.
+// ApplyFix applies remediation without a job ID (legacy path).
+func ApplyFix(rule policy.Rule) error {
+	return ApplyFixWithJob(rule, "")
+}
+
 func RevertFix(rule policy.Rule) error {
 	worker := platform.GetPlatform()
 	secManager := NewSecEditManager()
 
-	// Attempt to use captured state from DB.
 	rawCapture, dbErr := state.GetRollbackData(rule.ID)
 	if dbErr == nil && rawCapture != "" {
-		// Try to parse as CapturedState JSON.
 		var cs CapturedState
 		if jsonErr := json.Unmarshal([]byte(rawCapture), &cs); jsonErr == nil {
-			// We have structured state. For "raw_value" type, we can only
-			// restore config-file values; other types fall through to rollback definition.
 			if cs.StateType == "raw_value" && rule.Rollback.Type == "file_edit" {
-				fmt.Printf("[ROLLBACK] Using captured state for %s (value: %.40s...)\n", rule.ID, cs.Value)
-				return worker.EditConfigFile(
-					rule.Rollback.FilePath,
-					rule.Rollback.SearchRegex,
-					cs.Value,
-				)
+				return worker.EditConfigFile(rule.Rollback.FilePath, rule.Rollback.SearchRegex, cs.Value)
 			}
 		}
 	}
 
-	// Fall back to the static rollback definition in the policy.
 	var err error
 	switch rule.Rollback.Type {
 	case "registry":
@@ -418,22 +529,43 @@ func RevertFix(rule policy.Rule) error {
 	return err
 }
 
+// RevertFixWithJob records the recovery attempt while preserving the legacy
+// rollback implementation. The current rollback path has no independent
+// post-recovery check, so success is explicitly marked unverified.
+func RevertFixWithJob(rule policy.Rule, jobID string) error {
+	emit := func(ev *events.Event) {
+		if jobID != "" {
+			events.GlobalBus.Emit(jobID, ev)
+		}
+	}
+	emit(events.New(jobID, rule.ID, events.TypeRecoveryStarted, events.LevelInfo,
+		"Starting rollback operation for control "+rule.ID, nil))
+	err := RevertFix(rule)
+	if err != nil {
+		emit(&events.Event{JobID: jobID, ControlID: rule.ID, EventType: events.TypeRecoveryCompleted,
+			Level: events.LevelError, Status: "FAILED", Message: "Rollback operation failed", ErrorCode: "RECOVERY_FAILED"})
+		emit(events.New(jobID, rule.ID, events.TypeJobFailed, events.LevelError, "Recovery failed", nil))
+		return err
+	}
+	emit(&events.Event{JobID: jobID, ControlID: rule.ID, EventType: events.TypeRecoveryCompleted,
+		Level: events.LevelWarn, Status: "APPLIED_UNVERIFIED",
+		Message: "Rollback operation returned successfully; restored state was not independently verified"})
+	emit(&events.Event{JobID: jobID, ControlID: rule.ID, EventType: events.TypeJobCompleted,
+		Level: events.LevelWarn, Status: "APPLIED_UNVERIFIED",
+		Message: "Recovery operation completed; restored state remains unverified"})
+	return nil
+}
+
 func RevertAll(pol *policy.Policy) (string, error) {
 	revertedCount := 0
 	errorCount := 0
-
-	fmt.Println("[RESET] Starting MASTER FORCE RESET...")
-
 	for _, rule := range pol.Rules {
-		fmt.Printf("   > Force Reverting: %s\n", rule.ID)
 		err := RevertFix(rule)
 		if err != nil {
-			fmt.Printf("     [WARN] Revert issue on %s: %v\n", rule.ID, err)
 			errorCount++
 		} else {
 			revertedCount++
 		}
 	}
-
 	return fmt.Sprintf("Reset Complete. Reverted %d rules. Errors: %d", revertedCount, errorCount), nil
 }
